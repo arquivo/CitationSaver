@@ -14,8 +14,9 @@ from urllib.parse import urlparse, ParseResult
 
 # Parse args
 parser = argparse.ArgumentParser(description='Description of your program')
-parser.add_argument('-p','--path', help='Localization of the patching files', default= "./CitationSaver/")
-parser.add_argument('-d','--destination', help='Destination of the patching files merged', default= "./URLs/")
+parser.add_argument('-p','--path', help='Localization of the files', default= "./CitationSaver/")
+parser.add_argument('-d','--destination', help='Destination of the URLs extract', default= "./URLs/")
+parser.add_argument('-a','--afterprocessed', help='Destination of the files processed', default= "./Processed/")
 args = vars(parser.parse_args())
 
 # Extract URLs from text
@@ -47,6 +48,7 @@ def processPDFs():
     ##Process input
     mypath = args['path']
     destination = args['destination']
+    afterprocessed = args['afterprocessed']
     
     click.secho("Read inputs...", fg='green')
     
@@ -142,6 +144,9 @@ def processPDFs():
                                 check_url(scheme, netloc, path, url_parse, output)
                             except:
                                 continue
+
+                    #Move the processed pdf to a different folder
+                    os.system("mv " + filename + " " + afterprocessed)
 
 if __name__ == '__main__':
     processPDFs()
