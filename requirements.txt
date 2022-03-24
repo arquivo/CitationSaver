@@ -1,5 +1,5 @@
 PyPDF2==1.26.0
-pdfx=1.4.1
+pdfx==1.4.1
 urlextract==1.5.0
 requests==2.27.1
 fitz==1.16.8
