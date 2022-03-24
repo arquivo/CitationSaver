@@ -146,7 +146,7 @@ def processPDFs():
                                 continue
 
                     #Move the processed pdf to a different folder
-                    os.system("mv " + filename + " " + afterprocessed)
+                    os.system("mv " + file_name + " " + afterprocessed)
 
 if __name__ == '__main__':
     processPDFs()
