@@ -56,6 +56,10 @@ def processPDFs():
     if not os.path.exists(destination):
         os.makedirs(destination)
 
+    #Check if exists Directory of afterprocessed
+    if not os.path.exists(afterprocessed):
+        os.makedirs(afterprocessed)
+
     #Start the process
     click.secho("Starting process documents...", fg='green')
     for subdir, dirs, files in os.walk(mypath):
