@@ -42,6 +42,11 @@ def check_url(scheme, netloc, path, url_parse, output):
         if str(response.status_code).startswith("2") or str(response.status_code).startswith("3"):
             output.write(url_parse.geturl()+"\n")  
 
+def check_pdf(file):
+    try:
+        pdf = PyPDF2.PdfFileReader(file)
+    except PdfReadError:
+        raise forms.ValidationError, 'You must upload a valid PDF file'
 
 def processPDFs():
 
@@ -73,11 +78,14 @@ def processPDFs():
                     #List with the URLs extracted
                     list_urls = []
 
+
+
                     #Check if the file is a pdf
                     if file.endswith(".pdf"):
 
                         file_name = os.path.join(subdir, file)
 
+                        check_pdf(file_name)
                         #First method: PyPDF2
      
                         # Open File file
