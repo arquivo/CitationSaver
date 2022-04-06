@@ -129,36 +129,36 @@ def processPDFs():
                         
                         extract_url(text, list_urls)
 
-                    # Process the URLs 
-                    output_file = destination + "output_URLs_" + file.replace(".pdf", "") + ".txt"
-                    with open(output_file, 'w') as output:
+                        # Process the URLs 
+                        output_file = destination + "output_URLs_" + file.replace(".pdf", "") + ".txt"
+                        with open(output_file, 'w') as output:
 
-                        # Remove mailto links
-                        links = [url for url in list_urls if "mailto:" not in url]
-                        
-                        for elem in links:
-
-                            #Remove trash at the end of the URLs
-                            if elem.endswith(";") or elem.endswith(".") or elem.endswith(")") or elem.endswith("/"):
-                                elem = elem[:-1]
-
-                            url_parse = urlparse(elem, 'http')
-
-                            #URL parse
-                            scheme = url_parse.scheme
-                            netloc = url_parse.netloc or url_parse.path
-                            path = url_parse.path if url_parse.netloc else ''
+                            # Remove mailto links
+                            links = [url for url in list_urls if "mailto:" not in url]
                             
-                            if not netloc.startswith('www.'):
-                                netloc = 'www.' + netloc 
-                            try:
-                                #Check if URL
-                                check_url(scheme, netloc, path, url_parse, output)
-                            except:
-                                continue
+                            for elem in links:
 
-                    #Move the processed pdf to a different folder
-                    os.system("mv " + file_name + " " + afterprocessed)
+                                #Remove trash at the end of the URLs
+                                if elem.endswith(";") or elem.endswith(".") or elem.endswith(")") or elem.endswith("/"):
+                                    elem = elem[:-1]
+
+                                url_parse = urlparse(elem, 'http')
+
+                                #URL parse
+                                scheme = url_parse.scheme
+                                netloc = url_parse.netloc or url_parse.path
+                                path = url_parse.path if url_parse.netloc else ''
+                                
+                                if not netloc.startswith('www.'):
+                                    netloc = 'www.' + netloc 
+                                try:
+                                    #Check if URL
+                                    check_url(scheme, netloc, path, url_parse, output)
+                                except:
+                                    continue
+
+                        #Move the processed pdf to a different folder
+                        os.system("mv " + file_name + " " + afterprocessed)
 
 if __name__ == '__main__':
     processPDFs()
