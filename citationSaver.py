@@ -4,11 +4,12 @@ import re
 import pdfx
 from urlextract import URLExtract
 import requests
-import fitz
+#import fitz
 import click
 import argparse
 import os
 from urllib.parse import urlparse, ParseResult
+from PyPDF2.utils import PdfReadError
 
 #import pdb;pdb.set_trace()
 
@@ -46,7 +47,7 @@ def check_pdf(file):
     try:
         pdf = PyPDF2.PdfFileReader(file)
     except PdfReadError:
-        raise forms.ValidationError, 'You must upload a valid PDF file'
+        raise Exception('You must upload a valid PDF file')
 
 def processPDFs():
 
@@ -54,6 +55,7 @@ def processPDFs():
     mypath = args['path']
     destination = args['destination']
     afterprocessed = args['afterprocessed']
+    pathwarc = args['pathwarc']
     
     click.secho("Read inputs...", fg='green')
     
@@ -118,7 +120,7 @@ def processPDFs():
                                 list_urls.append(elem)
 
                         #Third method: fitz
-                        
+
                         # Load PDF
                         with fitz.open(file_name) as doc:
                             text = ""
@@ -159,6 +161,7 @@ def processPDFs():
 
                     #Move the processed pdf to a different folder
                     os.system("mv " + file_name + " " + afterprocessed)
+
 
 if __name__ == '__main__':
     processPDFs()
