@@ -4,7 +4,7 @@ import re
 import pdfx
 from urlextract import URLExtract
 import requests
-#import fitz
+import fitz
 import click
 import argparse
 import os
@@ -55,7 +55,6 @@ def processPDFs():
     mypath = args['path']
     destination = args['destination']
     afterprocessed = args['afterprocessed']
-    pathwarc = args['pathwarc']
     
     click.secho("Read inputs...", fg='green')
     
@@ -79,7 +78,6 @@ def processPDFs():
 
                     #List with the URLs extracted
                     list_urls = []
-
 
 
                     #Check if the file is a pdf
@@ -161,7 +159,6 @@ def processPDFs():
 
                     #Move the processed pdf to a different folder
                     os.system("mv " + file_name + " " + afterprocessed)
-
 
 if __name__ == '__main__':
     processPDFs()
