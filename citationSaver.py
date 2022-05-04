@@ -44,10 +44,10 @@ def check_url(scheme, netloc, path, url_parse, output):
             output.write(url_parse.geturl()+"\n")  
 
 def check_pdf(file):
-    try:
-        pdf = PyPDF2.PdfFileReader(file)
-    except PdfReadError:
-        raise Exception('You must upload a valid PDF file')
+    #try:
+    pdf = PyPDF2.PdfFileReader(file)
+    #except PdfReadError:
+    #raise Exception('You must upload a valid PDF file')
 
 def processPDFs():
 
