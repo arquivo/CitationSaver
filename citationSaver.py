@@ -1,6 +1,6 @@
 # Import Module
 import PyPDF2
-import re
+from PyPDF2.utils import PdfReadError
 import pdfx
 from urlextract import URLExtract
 import requests
@@ -9,7 +9,10 @@ import click
 import argparse
 import os
 from urllib.parse import urlparse, ParseResult
-from PyPDF2.utils import PdfReadError
+from fpdf import FPDF
+import gspread
+import pandas as pd
+from gspread_dataframe import get_as_dataframe, set_with_dataframe
 
 #import pdb;pdb.set_trace()
 
@@ -18,7 +21,22 @@ parser = argparse.ArgumentParser(description='Description of your program')
 parser.add_argument('-p','--path', help='Localization of the files', default= "./CitationSaver/")
 parser.add_argument('-d','--destination', help='Destination of the URLs extract', default= "./URLs/")
 parser.add_argument('-a','--afterprocessed', help='Destination of the files processed', default= "./Processed/")
+parser.add_argument('-w','--pathwarc', help='Destination of the WARCs for each file', default= "./WARCs/")
+parser.add_argument('-j','--pathjson', help='Destination of the json file with google service key', default= "JSON")
+parser.add_argument('-k','--key', help='Key Google Spreadsheet', default= "KEY")
+parser.add_argument('-ws','--worksheet', help='Worksheet Google Spreadsheet', default= "WORKSHEET")
 args = vars(parser.parse_args())
+
+#Connect gspread
+gc = gspread.service_account(filename=args['pathjson'])
+sh =  gc.open_by_key(args['key'])
+worksheet = sh.worksheet(args['worksheet'])
+
+#Transform worksheet to pandas dataframe
+df = get_as_dataframe(worksheet)
+
+#Global variable with the URLs check for each document
+list_urls_check = []
 
 # Extract URLs from text
 def extract_url(text, list_urls):
@@ -37,26 +55,165 @@ def check_url(scheme, netloc, path, url_parse, output):
     response = requests.head(url_parse.geturl())
     if str(response.status_code).startswith("2") or str(response.status_code).startswith("3"):
         output.write(url_parse.geturl()+"\n")
+        list_urls_check.append(url_parse.geturl())
     else:
         url_parse = ParseResult("https", netloc, path, *url_parse[3:])
         response = requests.head(url_parse.geturl())
         if str(response.status_code).startswith("2") or str(response.status_code).startswith("3"):
-            output.write(url_parse.geturl()+"\n")  
+            output.write(url_parse.geturl()+"\n")
+            list_urls_check.append(url_parse.geturl())
 
-def check_pdf(file):
-    #try:
-    pdf = PyPDF2.PdfFileReader(file)
-    #except PdfReadError:
-    #raise Exception('You must upload a valid PDF file')
+def check_pdf(file_name, file):
+    try:
+        pdf = PyPDF2.PdfFileReader(file_name)
+        return True
+    except PdfReadError:
+        return False
 
-def processPDFs():
+def extract_urls_pdf(file, file_name, list_urls):
+
+    #First method: PyPDF2
+
+    # Open File file
+    pdfFileObject = open(file_name, 'rb')
+      
+    pdfReader = PyPDF2.PdfFileReader(pdfFileObject)
+
+    # Iterate through all pages
+    for page_number in range(pdfReader.numPages):
+         
+        pageObject = pdfReader.getPage(page_number)
+         
+        # Extract text from page
+        pdf_text = pageObject.extractText()
+        
+        extract_url(pdf_text, list_urls)
+
+        if not list_urls:
+            #Update GoogleSheet
+            update_google_sheet(file, "", "", "", "Problem using PyPDF2 process", True)
+
+    # CLose the PDF
+    pdfFileObject.close()
+
+    #Second method: PDFx
+    
+    # Read PDF File
+    pdf = pdfx.PDFx(file_name)
+    
+    # Get list of URL
+    json = pdf.get_references_as_dict()
+    if len(json) != 0:
+        for elem in json['url']:
+            if elem not in list_urls:
+                list_urls.append(elem)
+    else:
+        #Update GoogleSheet
+        update_google_sheet(file, "", "", "", "Problem using PDFx process", True)
+
+    #Third method: fitz
+
+    # Load PDF
+    with fitz.open(file_name) as doc:
+        text = ""
+        for page in doc:
+            text += page.getText().strip()#.replace("\n", "")
+
+    text = ' '.join(text.split())
+    
+    extract_url(text, list_urls)
+
+def check_urls(list_urls, output_file):
+
+    urls_to_google_sheet = []
+
+    if list_urls != []:
+        # Process the URLs 
+        
+        with open(output_file, 'w') as output:
+
+            # Remove mailto links
+            links = [url for url in list_urls if "mailto:" not in url]
+            
+            for elem in links:
+
+                #Remove trash at the end of the URLs
+                if elem.endswith(";") or elem.endswith(".") or elem.endswith(")") or elem.endswith("/"):
+                    elem = elem[:-1]
+
+                url_parse = urlparse(elem, 'http')
+
+                #URL parse
+                scheme = url_parse.scheme
+                netloc = url_parse.netloc or url_parse.path
+                path = url_parse.path if url_parse.netloc else ''
+                
+                if not netloc.startswith('www.'):
+                    netloc = 'www.' + netloc 
+                try:
+                    #Check if URL
+                    check_url(scheme, netloc, path, url_parse, output)
+                except:
+                    continue
+    #else:
+        #do something
+
+def update_google_sheet(file, path_output, list_urls, list_urls_check, note, error):
+    
+    #Get the index from the file being processed in the google sheet
+    index = df.index[df['File Name CitationSaver System']==file].tolist()
+
+    if not error:
+
+        #Check if columns are empty for the present row
+        if pd.isnull(df.at[index[0], 'Results URLs File Path']) and pd.isnull(df.at[index[0], 'Results URLs without check']) and pd.isnull(df.at[index[0], 'Results URLs with check']) and pd.isnull(df.at[index[0], 'Note/Error']):
+                
+                #Update value Google Sheet
+                df.at[index[0], 'Results URLs File Path'] = path_output
+                df.at[index[0], 'Results URLs without check'] = list_urls
+                df.at[index[0], 'Results URLs with check'] = list_urls_check
+                if note != "":
+                    if not pd.isnull(df.at[index[0], 'Note/Error']):
+                        df.at[index[0], 'Note/Error'] = str(df.at[index[0], 'Note/Error']) + " " + note
+                    else:
+                        df.at[index[0], 'Note/Error'] = note
+    
+        else:
+            #Put an extra note with this problem
+            if not pd.isnull(df.at[index[0], 'Note/Error']) and "The script is processing the same document over and over again" not in df.at[index[0], 'Note/Error']:
+                df.at[index[0], 'Note/Error'] = str(df.at[index[0], 'Note/Error']) + "; The script is processing the same document over and over again"
+            else:
+                df.at[index[0], 'Note/Error'] = "The script is processing the same document over and over again"
+    
+    else:
+        
+        if path_output == "-" and list_urls == "-" and list_urls_check == "-":
+            
+            #Update value Google Sheet
+            df.at[index[0], 'Results URLs File Path'] = path_output
+            df.at[index[0], 'Results URLs without check'] = list_urls
+            df.at[index[0], 'Results URLs with check'] = list_urls_check
+            df.at[index[0], 'Note/Error'] = note
+        
+        else:
+            if not pd.isnull(df.at[index[0], 'Note/Error']):
+                df.at[index[0], 'Note/Error'] = str(df.at[index[0], 'Note/Error']) + " " + note
+            else:
+                df.at[index[0], 'Note/Error'] = note
+
+
+    #Update the google sheet
+    set_with_dataframe(worksheet, df)
+
+
+def processCitationSaver():
+
+    click.secho("Read inputs...", fg='green')
 
     ##Process input
     mypath = args['path']
     destination = args['destination']
     afterprocessed = args['afterprocessed']
-    
-    click.secho("Read inputs...", fg='green')
     
     #Check if exists Directory of destination
     if not os.path.exists(destination):
@@ -68,10 +225,17 @@ def processPDFs():
 
     #Start the process
     click.secho("Starting process documents...", fg='green')
+
+    #Iterate through the files inside the folder
     for subdir, dirs, files in os.walk(mypath):
+        
+        #Check if the directory is not empty
         if files:
+
+            #Check the progress
             with click.progressbar(length=len(files), show_pos=True) as progress_bar:
                 
+                #For each file
                 for file in files:
 
                     progress_bar.update(1)
@@ -79,86 +243,170 @@ def processPDFs():
                     #List with the URLs extracted
                     list_urls = []
 
+                    #Complete file path name
+                    file_name = os.path.join(subdir, file)
 
                     #Check if the file is a pdf
                     if file.endswith(".pdf"):
 
-                        file_name = os.path.join(subdir, file)
-
-                        check_pdf(file_name)
-                        #First method: PyPDF2
-     
-                        # Open File file
-                        pdfFileObject = open(file_name, 'rb')
-                          
-                        pdfReader = PyPDF2.PdfFileReader(pdfFileObject)
-
-                        # Iterate through all pages
-                        for page_number in range(pdfReader.numPages):
-                             
-                            pageObject = pdfReader.getPage(page_number)
-                             
-                            # Extract text from page
-                            pdf_text = pageObject.extractText()
+                        #Check if the pdf is well formed
+                        if check_pdf(file_name, file):
                             
-                            extract_url(pdf_text, list_urls)
+                            #Extract URLs using PyPDF2, PDFx, fitz
+                            extract_urls_pdf(file, file_name, list_urls)
 
-                        # CLose the PDF
-                        pdfFileObject.close()
+                            output_file = destination + "output_URLs_" + file.replace(".pdf", "") + ".txt"
 
-                        #Second method: PDFx
-                        
-                        # Read PDF File
-                        pdf = pdfx.PDFx(file_name)
-                         
-                        # Get list of URL
-                        json = pdf.get_references_as_dict()
-                        for elem in json['url']:
-                            if elem not in list_urls:
-                                list_urls.append(elem)
+                            #Check if the URLs are correct and write in a file
+                            check_urls(list_urls, output_file)
 
-                        #Third method: fitz
+                            #Update GoogleSheet
+                            update_google_sheet(file, output_file, list_urls, list_urls_check, "", False)
 
-                        # Load PDF
-                        with fitz.open(file_name) as doc:
-                            text = ""
-                            for page in doc:
-                                text += page.getText().strip()#.replace("\n", "")
-
-                        text = ' '.join(text.split())
-                        
-                        extract_url(text, list_urls)
-
-                        # Process the URLs 
-                        output_file = destination + "output_URLs_" + file.replace(".pdf", "") + ".txt"
-                        with open(output_file, 'w') as output:
-
-                            # Remove mailto links
-                            links = [url for url in list_urls if "mailto:" not in url]
-                            
-                            for elem in links:
-
-                                #Remove trash at the end of the URLs
-                                if elem.endswith(";") or elem.endswith(".") or elem.endswith(")") or elem.endswith("/"):
-                                    elem = elem[:-1]
-
-                                url_parse = urlparse(elem, 'http')
-
-                                #URL parse
-                                scheme = url_parse.scheme
-                                netloc = url_parse.netloc or url_parse.path
-                                path = url_parse.path if url_parse.netloc else ''
-                                
-                                if not netloc.startswith('www.'):
-                                    netloc = 'www.' + netloc 
-                                try:
-                                    #Check if URL
-                                    check_url(scheme, netloc, path, url_parse, output)
-                                except:
-                                    continue
+                        else:
+                            #Update GoogleSheet
+                            update_google_sheet(file, "-", "-", "-", "The PDF download is not in the correct form", True)
 
                         #Move the processed pdf to a different folder
                         os.system("mv " + file_name + " " + afterprocessed)
 
+                    #Check if the file is a txt
+                    elif file.endswith(".txt"):
+
+                        pdf = FPDF()
+                        # Add a page
+                        pdf.add_page()
+                        # set style and size of font 
+                        # that you want in the pdf
+                        pdf.set_font("Arial", size = 15)
+
+                        # open the text file in read mode
+                        f = open(file_name, "r", encoding='ISO-8859-1')
+                          
+                        # insert the texts in pdf
+                        for x in f:
+                            pdf.cell(200, 10, txt = x, ln = 1, align = 'C')
+                           
+                        # save the pdf with name .pdf
+                        pdf.output(file_name.replace(".txt", ".pdf"))
+
+                        #Move the processed pdf to a different folder
+                        os.system("mv " + file_name + " " + afterprocessed)
+
+                        #Extract URLs using PyPDF2, PDFx, fitz
+                        extract_urls_pdf(file, file_name.replace(".txt", ".pdf"), list_urls)
+
+                        output_file = destination + "output_URLs_" + file.replace(".pdf", "") + ".txt"
+
+                        #Check if the URLs are correct and write in a file
+                        check_urls(list_urls, output_file)
+
+                        #Update GoogleSheet
+                        update_google_sheet(file, output_file, list_urls, list_urls_check, "", False)
+
+                        #Move the processed pdf to a different folder
+                        os.system("rm -rf " + file_name.replace(".txt", ".pdf"))
+
+                    #Check if the file is a link
+                    elif file.endswith(".link"):
+                        
+                        #Open the file
+                        file_link = open(file_name, "rb")
+                        
+                        if len(file_link.readlines()) == 1:
+
+                            #Get the first row
+                            first_line = file_link.readline()
+
+                            #Request the content
+                            response = requests.get(first_line)
+                            
+                            if response.status_code == 200:
+
+                                #Get the type of document downloaded
+                                content_type = response.headers.get('content-type')
+
+                                #Sanity Check
+                                if content_type == "application/pdf":
+
+                                    #Create a new PDF file with the response content
+                                    file_output = os.path.join(subdir, file.replace(".link", ".pdf"))
+                                    output = open(file_output, "wb")
+                                    output.write(response.content)
+
+                                    #Remove the processed .link file
+                                    os.system("rm -rf " + file_name)
+
+                                    ###Same process as for PDFs files
+
+                                    #Check if the pdf is well formed
+                                    if check_pdf(file_output, file):
+                                    
+                                        #Extract URLs using PyPDF2, PDFx, fitz
+                                        extract_urls_pdf(file, file_output, list_urls)
+
+                                        output_file = destination + "output_URLs_" + file.replace(".link", ".txt")
+
+                                        #Check if the URLs are correct and write in a file
+                                        check_urls(list_urls, output_file)
+
+                                        #Update GoogleSheet
+                                        update_google_sheet(file, output_file, list_urls, list_urls_check, "", False)
+                                    
+                                    else:
+                                        #Update GoogleSheet
+                                        update_google_sheet(file, "-", "-", "-", "The PDF download is not in the correct form", True)
+
+                                    #Move the processed pdf to a different folder
+                                    os.system("mv " + file_output + " " + afterprocessed)
+
+                                else:
+                                    #Update GoogleSheet
+                                    update_google_sheet(file, "-", "-", "-", "The document download is not application/pdf", True)
+                            else:
+                                #Update GoogleSheet
+                                update_google_sheet(file, "-", "-", "-", "The link is not 200", True)
+                        else:
+                            #Update GoogleSheet
+                            update_google_sheet(file, "-", "-", "-", "The link have more than one line", True)
+        
 if __name__ == '__main__':
-    processPDFs()
+    processCitationSaver()
+
+ 
+"""
+###########################
+
+###Save URLs to WARC using wget
+###Will be not use in this first stage
+
+###########################
+
+pathwarc = args['pathwarc']
+
+#Check if exists Directory of pathwarc
+if not os.path.exists(pathwarc):
+    os.makedirs(pathwarc)
+
+#Start the process
+click.secho("Starting crawling...", fg='green')
+for subdir, dirs, files in os.walk(destination):
+    if files:
+        with click.progressbar(length=len(files), show_pos=True) as progress_bar:
+            
+            for file in files:
+
+                progress_bar.update(1)
+
+                file_URLs = os.path.join(subdir, file)
+
+                if file.endswith(".pdf"):
+
+                    file_warc = pathwarc + file.replace(".txt", "")
+                    
+                    os.system("wget --page-requisites --span-hosts --convert-links  --execute robots=off --adjust-extension --no-directories --directory-prefix=output --warc-cdx --warc-file=" + file_warc + " --wait=0.1 --user-agent=\"Arquivo-web-crawler (compatible; CitationSaver +https://arquivo.pt/faq-crawling)\" -i " + file_URLs)
+
+                    cdx_file = pathwarc + file.replace(".txt", "") + ".cdx"
+
+                    os.system("rm -rf " + cdx_file)
+"""
