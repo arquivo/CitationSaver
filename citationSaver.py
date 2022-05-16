@@ -89,9 +89,9 @@ def extract_urls_pdf(file, file_name, list_urls):
         
         extract_url(pdf_text, list_urls)
 
-        if not list_urls:
-            #Update GoogleSheet
-            update_google_sheet(file, "", "", "", "Problem using PyPDF2 process", True)
+    if not list_urls:
+        #Update GoogleSheet
+        update_google_sheet(file, "", "", "", "Problem using PyPDF2 process", True)
 
     # CLose the PDF
     pdfFileObject.close()
