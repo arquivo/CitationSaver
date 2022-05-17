@@ -311,12 +311,14 @@ def processCitationSaver():
                     elif file.endswith(".link"):
                         
                         #Open the file
-                        file_link = open(file_name, "rb")
+                        file_link = open(file_name, "r")
+
+                        lines = file_link.readlines()
                         
-                        if len(file_link.readlines()) == 1:
+                        if len(lines) == 1:
 
                             #Get the first row
-                            first_line = file_link.readline()
+                            first_line = lines[0]
 
                             #Request the content
                             response = requests.get(first_line)
