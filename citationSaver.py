@@ -242,6 +242,7 @@ def processCitationSaver():
 
                     #List with the URLs extracted
                     list_urls = []
+                    list_urls_check = []
 
                     #Complete file path name
                     file_name = os.path.join(subdir, file)
