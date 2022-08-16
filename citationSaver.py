@@ -172,7 +172,6 @@ def update_google_sheet(file, path_output, list_urls, list_urls_check, note, err
                 df.at[index[0], 'Results URLs File Path'] = path_output
                 df.at[index[0], 'Results URLs without check'] = list_urls
                 df.at[index[0], 'Results URLs with check'] = list_urls_check
-                list_urls_check = []
                 if note != "":
                     if not pd.isnull(df.at[index[0], 'Note/Error']):
                         df.at[index[0], 'Note/Error'] = str(df.at[index[0], 'Note/Error']) + " " + note
@@ -206,6 +205,7 @@ def update_google_sheet(file, path_output, list_urls, list_urls_check, note, err
     #Update the google sheet
     set_with_dataframe(worksheet, df)
 
+    list_urls_check = []
 
 def processCitationSaver():
 
