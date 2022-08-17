@@ -65,7 +65,7 @@ def check_url(scheme, netloc, path, url_parse, output, list_urls_check):
                 output.write(url_parse.geturl()+"\n")
                 list_urls_check.append(url_parse.geturl())
     except:
-        continue
+        return list_urls_check
 
     return list_urls_check
 
@@ -89,7 +89,7 @@ def extract_urls_pdf(file, file_name, list_urls):
     for page_number in range(pdfReader.numPages):
          
         pageObject = pdfReader.getPage(page_number)
-         
+        
         # Extract text from page
         pdf_text = pageObject.extractText()
         
