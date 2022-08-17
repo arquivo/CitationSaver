@@ -36,7 +36,7 @@ worksheet = sh.worksheet(args['worksheet'])
 df = get_as_dataframe(worksheet)
 
 #Global variable with the URLs check for each document
-list_urls_check = []
+#list_urls_check = []
 
 # Extract URLs from text
 def extract_url(text, list_urls):
@@ -50,18 +50,24 @@ def extract_url(text, list_urls):
             list_urls.append(url)
 
 # Check if the URLs is available
-def check_url(scheme, netloc, path, url_parse, output):
+def check_url(scheme, netloc, path, url_parse, output, list_urls_check):
     url_parse = ParseResult(scheme, netloc, path, *url_parse[3:])
-    response = requests.head(url_parse.geturl())
-    if str(response.status_code).startswith("2") or str(response.status_code).startswith("3"):
-        output.write(url_parse.geturl()+"\n")
-        list_urls_check.append(url_parse.geturl())
-    else:
-        url_parse = ParseResult("https", netloc, path, *url_parse[3:])
+                
+    try:
         response = requests.head(url_parse.geturl())
         if str(response.status_code).startswith("2") or str(response.status_code).startswith("3"):
             output.write(url_parse.geturl()+"\n")
             list_urls_check.append(url_parse.geturl())
+        else:
+            url_parse = ParseResult("https", netloc, path, *url_parse[3:])
+            response = requests.head(url_parse.geturl())
+            if str(response.status_code).startswith("2") or str(response.status_code).startswith("3"):
+                output.write(url_parse.geturl()+"\n")
+                list_urls_check.append(url_parse.geturl())
+    except:
+        continue
+
+    return list_urls_check
 
 def check_pdf(file_name, file):
     try:
@@ -125,8 +131,6 @@ def extract_urls_pdf(file, file_name, list_urls):
 
 def check_urls(list_urls, output_file):
 
-    urls_to_google_sheet = []
-
     if list_urls != []:
         # Process the URLs 
         
@@ -150,11 +154,11 @@ def check_urls(list_urls, output_file):
                 
                 if not netloc.startswith('www.'):
                     netloc = 'www.' + netloc 
-                try:
-                    #Check if URL
-                    check_url(scheme, netloc, path, url_parse, output)
-                except:
-                    continue
+                
+                #Check if URL
+                list_urls_check = check_url(scheme, netloc, path, url_parse, output, list_urls_check)
+
+    return list_urls_check
     #else:
         #do something
 
@@ -205,8 +209,6 @@ def update_google_sheet(file, path_output, list_urls, list_urls_check, note, err
     #Update the google sheet
     set_with_dataframe(worksheet, df)
 
-    list_urls_check = []
-
 def processCitationSaver():
 
     click.secho("Read inputs...", fg='green')
@@ -243,6 +245,7 @@ def processCitationSaver():
 
                     #List with the URLs extracted
                     list_urls = []
+                    list_urls_check = []
 
                     #Complete file path name
                     file_name = os.path.join(subdir, file)
@@ -259,7 +262,7 @@ def processCitationSaver():
                             output_file = destination + "output_URLs_" + file.replace(".pdf", "") + ".txt"
 
                             #Check if the URLs are correct and write in a file
-                            check_urls(list_urls, output_file)
+                            list_urls_check = check_urls(list_urls, output_file, list_urls_check)
 
                             #Update GoogleSheet
                             update_google_sheet(file, output_file, list_urls, list_urls_check, "", False)
@@ -300,7 +303,7 @@ def processCitationSaver():
                         output_file = destination + "output_URLs_" + file.replace(".pdf", "") + ".txt"
 
                         #Check if the URLs are correct and write in a file
-                        check_urls(list_urls, output_file)
+                        list_urls_check = check_urls(list_urls, output_file, list_urls_check)
 
                         #Update GoogleSheet
                         update_google_sheet(file, output_file, list_urls, list_urls_check, "", False)
@@ -351,7 +354,7 @@ def processCitationSaver():
                                         output_file = destination + "output_URLs_" + file.replace(".link", ".txt")
 
                                         #Check if the URLs are correct and write in a file
-                                        check_urls(list_urls, output_file)
+                                        list_urls_check = check_urls(list_urls, output_file, list_urls_check)
 
                                         #Update GoogleSheet
                                         update_google_sheet(file, output_file, list_urls, list_urls_check, "", False)
@@ -372,6 +375,9 @@ def processCitationSaver():
                         else:
                             #Update GoogleSheet
                             update_google_sheet(file, "-", "-", "-", "The link have more than one line", True)
+                    else:
+                        #Update GoogleSheet
+                        update_google_sheet(file, "-", "-", "-", "Wrong File", True)
         
 if __name__ == '__main__':
     processCitationSaver()
