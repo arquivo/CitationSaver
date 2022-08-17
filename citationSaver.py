@@ -129,7 +129,7 @@ def extract_urls_pdf(file, file_name, list_urls):
     
     extract_url(text, list_urls)
 
-def check_urls(list_urls, output_file):
+def check_urls(list_urls, output_file, list_urls_check):
 
     if list_urls != []:
         # Process the URLs 
