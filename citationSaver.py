@@ -131,6 +131,8 @@ def extract_urls_pdf(file, file_name, list_urls):
 
 def check_urls(list_urls, output_file, list_urls_check):
 
+    list_aux = []
+    
     if list_urls != []:
         # Process the URLs 
         
@@ -158,8 +160,11 @@ def check_urls(list_urls, output_file, list_urls_check):
                 #Right now, this step is too slow if we have a lot of URLs.
                 #Check if URL
                 #list_urls_check = check_url(scheme, netloc, path, url_parse, output, list_urls_check)
-
-                output.write(url_parse.geturl()+"\n")
+                
+                #remove duplicate
+                url_parse = ParseResult(scheme, netloc, path, *url_parse[3:].lower())
+                if url_parse.geturl() not in list_aux:
+                    output.write(url_parse.geturl()+"\n")
 
     return list_urls_check
     #else:
