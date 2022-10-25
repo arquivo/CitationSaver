@@ -155,8 +155,11 @@ def check_urls(list_urls, output_file, list_urls_check):
                 if not netloc.startswith('www.'):
                     netloc = 'www.' + netloc 
                 
+                #Right now, this step is too slow if we have a lot of URLs.
                 #Check if URL
-                list_urls_check = check_url(scheme, netloc, path, url_parse, output, list_urls_check)
+                #list_urls_check = check_url(scheme, netloc, path, url_parse, output, list_urls_check)
+
+                output.write(url_parse.geturl()+"\n")
 
     return list_urls_check
     #else:
@@ -385,18 +388,13 @@ if __name__ == '__main__':
  
 """
 ###########################
-
 ###Save URLs to WARC using wget
 ###Will be not use in this first stage
-
 ###########################
-
 pathwarc = args['pathwarc']
-
 #Check if exists Directory of pathwarc
 if not os.path.exists(pathwarc):
     os.makedirs(pathwarc)
-
 #Start the process
 click.secho("Starting crawling...", fg='green')
 for subdir, dirs, files in os.walk(destination):
@@ -404,18 +402,12 @@ for subdir, dirs, files in os.walk(destination):
         with click.progressbar(length=len(files), show_pos=True) as progress_bar:
             
             for file in files:
-
                 progress_bar.update(1)
-
                 file_URLs = os.path.join(subdir, file)
-
                 if file.endswith(".pdf"):
-
                     file_warc = pathwarc + file.replace(".txt", "")
                     
                     os.system("wget --page-requisites --span-hosts --convert-links  --execute robots=off --adjust-extension --no-directories --directory-prefix=output --warc-cdx --warc-file=" + file_warc + " --wait=0.1 --user-agent=\"Arquivo-web-crawler (compatible; CitationSaver +https://arquivo.pt/faq-crawling)\" -i " + file_URLs)
-
                     cdx_file = pathwarc + file.replace(".txt", "") + ".cdx"
-
                     os.system("rm -rf " + cdx_file)
 """
