@@ -162,8 +162,8 @@ def check_urls(list_urls, output_file, list_urls_check):
                 #list_urls_check = check_url(scheme, netloc, path, url_parse, output, list_urls_check)
                 
                 #remove duplicate
-                url_parse = ParseResult(scheme, netloc, path, *url_parse[3:].lower())
-                if url_parse.geturl() not in list_aux:
+                url_parse = ParseResult(scheme, netloc, path, *url_parse[3:])
+                if url_parse.geturl().lower() not in list_aux:
                     output.write(url_parse.geturl()+"\n")
 
     return list_urls_check
