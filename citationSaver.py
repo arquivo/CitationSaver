@@ -49,26 +49,6 @@ def extract_url(text, list_urls):
         if url not in list_urls:
             list_urls.append(url)
 
-# Check if the URLs is available
-def check_url(scheme, netloc, path, url_parse, output, list_urls_check):
-    url_parse = ParseResult(scheme, netloc, path, *url_parse[3:])
-                
-    try:
-        response = requests.head(url_parse.geturl())
-        if str(response.status_code).startswith("2") or str(response.status_code).startswith("3"):
-            output.write(url_parse.geturl()+"\n")
-            list_urls_check.append(url_parse.geturl())
-        else:
-            url_parse = ParseResult("https", netloc, path, *url_parse[3:])
-            response = requests.head(url_parse.geturl())
-            if str(response.status_code).startswith("2") or str(response.status_code).startswith("3"):
-                output.write(url_parse.geturl()+"\n")
-                list_urls_check.append(url_parse.geturl())
-    except:
-        return list_urls_check
-
-    return list_urls_check
-
 def check_pdf(file_name, file):
     try:
         pdf = PyPDF2.PdfFileReader(file_name)
@@ -130,9 +110,7 @@ def extract_urls_pdf(file, file_name, list_urls):
     extract_url(text, list_urls)
 
 def check_urls(list_urls, output_file, list_urls_check):
-
-    list_aux = []
-    
+ 
     if list_urls != []:
         # Process the URLs 
         
@@ -149,26 +127,16 @@ def check_urls(list_urls, output_file, list_urls_check):
 
                 url_parse = urlparse(elem, 'http')
 
-                #URL parse
-                scheme = url_parse.scheme
                 netloc = url_parse.netloc or url_parse.path
-                path = url_parse.path if url_parse.netloc else ''
                 
                 if not netloc.startswith('www.'):
                     netloc = 'www.' + netloc 
-                
-                #Right now, this step is too slow if we have a lot of URLs.
-                #Check if URL
-                #list_urls_check = check_url(scheme, netloc, path, url_parse, output, list_urls_check)
-                
-                #remove duplicate
-                url_parse = ParseResult(scheme, netloc, path, *url_parse[3:])
-                if url_parse.geturl().lower() not in list_aux:
-                    output.write(url_parse.geturl()+"\n")
+
+                if netloc.lower() not in list_urls_check:
+                    output.write(netloc.lower()+"\n")
+                    list_urls_check.append(netloc)
 
     return list_urls_check
-    #else:
-        #do something
 
 def update_google_sheet(file, path_output, list_urls, list_urls_check, note, error):
     
