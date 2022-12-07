@@ -162,12 +162,12 @@ def update_google_sheet(file, path_output, list_urls, list_urls_check, note, err
     if not error:
 
         #Check if columns are empty for the present row
-        if pd.isnull(df.at[index[0], 'Results URLs File Path']) and pd.isnull(df.at[index[0], 'Results URLs without check']) and pd.isnull(df.at[index[0], 'Results URLs with check']):
+        if pd.isnull(df.at[index[0], 'Results URLs File Path']) and pd.isnull(df.at[index[0], 'Results URLs without check']) and pd.isnull(df.at[index[0], 'Results URLs domain']):
                 
                 #Update value Google Sheet
                 df.at[index[0], 'Results URLs File Path'] = path_output
                 df.at[index[0], 'Results URLs without check'] = list_urls
-                df.at[index[0], 'Results URLs with check'] = list_urls_check
+                df.at[index[0], 'Results URLs domain'] = list_urls_check
                 if note != "":
                     if not pd.isnull(df.at[index[0], 'Note/Error']):
                         df.at[index[0], 'Note/Error'] = str(df.at[index[0], 'Note/Error']) + " " + note
@@ -188,7 +188,7 @@ def update_google_sheet(file, path_output, list_urls, list_urls_check, note, err
             #Update value Google Sheet
             df.at[index[0], 'Results URLs File Path'] = path_output
             df.at[index[0], 'Results URLs without check'] = list_urls
-            df.at[index[0], 'Results URLs with check'] = list_urls_check
+            df.at[index[0], 'Results URLs domain'] = list_urls_check
             df.at[index[0], 'Note/Error'] = note
         
         else:
