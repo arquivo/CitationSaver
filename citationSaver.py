@@ -13,6 +13,7 @@ from fpdf import FPDF
 import gspread
 import pandas as pd
 from gspread_dataframe import get_as_dataframe, set_with_dataframe
+from subprocess import PIPE, Popen
 
 #import pdb;pdb.set_trace()
 
@@ -58,6 +59,11 @@ def check_pdf(file_name, file):
 
 def extract_urls_pdf(file, file_name, list_urls):
 
+    """
+    PyPDF2 has problems processing pdfs. The words stay together. 
+    PyPDF2 will be deactivated for now.
+    """
+    """
     #First method: PyPDF2
 
     # Open File file
@@ -81,6 +87,7 @@ def extract_urls_pdf(file, file_name, list_urls):
 
     # CLose the PDF
     pdfFileObject.close()
+    """
 
     #Second method: PDFx
     
@@ -108,6 +115,15 @@ def extract_urls_pdf(file, file_name, list_urls):
     text = ' '.join(text.split())
     
     extract_url(text, list_urls)
+
+
+    #Third method: tika
+
+    # Load PDF
+    process = Popen(['java', '-jar', 'tika-app-1.24.1.jar', '-t', file_name], stdout=PIPE, stderr=PIPE)
+    result = process.communicate()
+
+    extract_url(result[0].decode('utf-8'), list_urls)
 
 def check_urls(list_urls, output_file, list_urls_check):
  
