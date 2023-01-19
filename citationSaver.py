@@ -54,7 +54,7 @@ def check_pdf(file_name, file):
     try:
         pdf = PyPDF2.PdfFileReader(file_name)
         return True
-    except:
+    except PdfReadError:
         return False
 
 def extract_urls_pdf(file, file_name, list_urls):
@@ -160,21 +160,20 @@ def update_google_sheet(file, path_output, list_urls, list_urls_check, note, err
     index = df.index[df['File Name CitationSaver System']==file].tolist()
 
     if not error:
-        try:
-            #Check if columns are empty for the present row
-            if pd.isnull(df.at[index[0], 'Results URLs File Path']) and pd.isnull(df.at[index[0], 'Results URLs without check']) and pd.isnull(df.at[index[0], 'Results URLs domain']):
-                    
-                    #Update value Google Sheet
-                    df.at[index[0], 'Results URLs File Path'] = path_output
-                    df.at[index[0], 'Results URLs without check'] = list_urls
-                    df.at[index[0], 'Results URLs domain'] = list_urls_check
-                    if note != "":
-                        if not pd.isnull(df.at[index[0], 'Note/Error']):
-                            df.at[index[0], 'Note/Error'] = str(df.at[index[0], 'Note/Error']) + " " + note
-                        else:
-                            df.at[index[0], 'Note/Error'] = note
-        except:
-            print(file)
+
+        #Check if columns are empty for the present row
+        if pd.isnull(df.at[index[0], 'Results URLs File Path']) and pd.isnull(df.at[index[0], 'Results URLs without check']) and pd.isnull(df.at[index[0], 'Results URLs domain']):
+                
+                #Update value Google Sheet
+                df.at[index[0], 'Results URLs File Path'] = path_output
+                df.at[index[0], 'Results URLs without check'] = list_urls
+                df.at[index[0], 'Results URLs domain'] = list_urls_check
+                if note != "":
+                    if not pd.isnull(df.at[index[0], 'Note/Error']):
+                        df.at[index[0], 'Note/Error'] = str(df.at[index[0], 'Note/Error']) + " " + note
+                    else:
+                        df.at[index[0], 'Note/Error'] = note
+    
         else:
             #Put an extra note with this problem
             if not pd.isnull(df.at[index[0], 'Note/Error']) and "The script is processing the same document over and over again" not in df.at[index[0], 'Note/Error']:
