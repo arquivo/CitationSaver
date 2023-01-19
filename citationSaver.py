@@ -88,7 +88,7 @@ def extract_urls_pdf(file, file_name, list_urls):
     # CLose the PDF
     pdfFileObject.close()
     """
-
+    """
     #Second method: PDFx
     
     # Read PDF File
@@ -115,7 +115,7 @@ def extract_urls_pdf(file, file_name, list_urls):
     text = ' '.join(text.split())
     
     extract_url(text, list_urls)
-
+    """
 
     #Third method: tika
 
