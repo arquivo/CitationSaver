@@ -197,10 +197,6 @@ def update_google_sheet(file, path_output, list_urls, list_urls_check, note, err
             else:
                 df.at[index[0], 'Note/Error'] = note
 
-
-    #Update the google sheet
-    set_with_dataframe(worksheet, df)
-
 def processCitationSaver():
 
     click.secho("Read inputs...", fg='green')
@@ -370,7 +366,10 @@ def processCitationSaver():
                     else:
                         #Update GoogleSheet
                         update_google_sheet(file, "-", "-", "-", "Wrong File", True)
-        
+    
+    #Update the google sheet
+    set_with_dataframe(worksheet, df)
+
 if __name__ == '__main__':
     processCitationSaver()
 
