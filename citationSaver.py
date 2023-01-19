@@ -54,7 +54,7 @@ def check_pdf(file_name, file):
     try:
         pdf = PyPDF2.PdfFileReader(file_name)
         return True
-    except PdfReadError:
+    except:
         return False
 
 def extract_urls_pdf(file, file_name, list_urls):
@@ -174,7 +174,7 @@ def update_google_sheet(file, path_output, list_urls, list_urls_check, note, err
                         else:
                             df.at[index[0], 'Note/Error'] = note
         except:
-            print("file")
+            print(file)
         else:
             #Put an extra note with this problem
             if not pd.isnull(df.at[index[0], 'Note/Error']) and "The script is processing the same document over and over again" not in df.at[index[0], 'Note/Error']:
