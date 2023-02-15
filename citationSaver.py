@@ -122,8 +122,9 @@ def extract_urls_pdf(file, file_name, list_urls):
     # Load PDF
     process = Popen(['java', '-jar', 'tika-app-1.24.1.jar', '-t', file_name], stdout=PIPE, stderr=PIPE)
     result = process.communicate()
-
+    print(result[0])
     extract_url(result[0].decode('utf-8'), list_urls)
+    print(list_urls)
 
 def check_urls(list_urls, output_file, list_urls_check):
  
