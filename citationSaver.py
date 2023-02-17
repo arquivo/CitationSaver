@@ -20,6 +20,7 @@ from subprocess import PIPE, Popen
 # Parse args
 parser = argparse.ArgumentParser(description='Description of your program')
 parser.add_argument('-p','--path', help='Localization of the files', default= "./CitationSaver/")
+parser.add_argument('-t','--tika', help='Localization of the Tika Jar', default= "tika-app-1.24.1.jar")
 parser.add_argument('-d','--destination', help='Destination of the URLs extract', default= "./URLs/")
 parser.add_argument('-a','--afterprocessed', help='Destination of the files processed', default= "./Processed/")
 parser.add_argument('-w','--pathwarc', help='Destination of the WARCs for each file', default= "./WARCs/")
@@ -35,6 +36,9 @@ worksheet = sh.worksheet(args['worksheet'])
 
 #Transform worksheet to pandas dataframe
 df = get_as_dataframe(worksheet)
+
+#Path Tika Jar
+path_tika = args['tika']
 
 #Global variable with the URLs check for each document
 #list_urls_check = []
@@ -120,11 +124,9 @@ def extract_urls_pdf(file, file_name, list_urls):
     #Third method: tika
 
     # Load PDF
-    process = Popen(['java', '-jar', 'tika-app-1.24.1.jar', '-t', file_name], stdout=PIPE, stderr=PIPE)
+    process = Popen(['java', '-jar', path_tika, '-t', file_name], stdout=PIPE, stderr=PIPE)
     result = process.communicate()
-    print(result[0])
     extract_url(result[0].decode('utf-8'), list_urls)
-    print(list_urls)
 
 def check_urls(list_urls, output_file, list_urls_check):
  
