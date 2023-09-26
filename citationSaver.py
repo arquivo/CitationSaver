@@ -62,7 +62,7 @@ def check_pdf(file_name, file):
     except PdfReadError:
         return False
 
-def extract_urls_pdf(file, file_name, list_urls, output_filename):
+def extract_urls_pdf(file, file_name, list_urls):
 
     """
     PyPDF2 has problems processing pdfs. The words stay together. 
