@@ -62,7 +62,7 @@ def check_pdf(file_name, file):
     except PdfReadError:
         return False
 
-def extract_urls_pdf(file, file_name, list_urls):
+def extract_urls_pdf(file, file_name, list_urls, output_filename):
 
     """
     PyPDF2 has problems processing pdfs. The words stay together. 
@@ -138,7 +138,7 @@ def extract_urls_pdf(file, file_name, list_urls):
 
     #TODO - Getting a mechanism to catch errors from tikalinkextract-linux64 script
     #Beware of the file's permissions (tikalinkextract-linux64)
-    os.system("./tikalinkextract-linux64 -seeds -file "+ file_name +" >> ./Output/" + output_filename)
+    os.system("./tikalinkextract-linux64 -seeds -file "+ file_name +" >> ./trash.txt")
 
     # Open the file in read mode
     with open('./Output/'+ output_filename, 'r') as file:
@@ -147,7 +147,9 @@ def extract_urls_pdf(file, file_name, list_urls):
     
 
     # Strip the newline characters from each line
-    list_urls = [line.strip() for line in lines]    
+    list_urls = [line.strip() for line in lines]
+
+    os.system("rm -rf ./Output./trash.txt")
 
 def check_urls(list_urls, output_file, list_urls_check):
  
