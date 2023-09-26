@@ -141,7 +141,7 @@ def extract_urls_pdf(file, file_name, list_urls):
     os.system("./tikalinkextract-linux64 -seeds -file "+ file_name +" >> ./trash.txt")
 
     # Open the file in read mode
-    with open('./Output/trash.txt', 'r') as file:
+    with open('./trash.txt', 'r') as file:
         # Read all lines from the file into a list
         lines = file.readlines()
     
@@ -149,7 +149,7 @@ def extract_urls_pdf(file, file_name, list_urls):
     # Strip the newline characters from each line
     list_urls = [line.strip() for line in lines]
 
-    os.system("rm -rf ./Output./trash.txt")
+    os.system("rm -rf ./trash.txt")
 
 def check_urls(list_urls, output_file, list_urls_check):
  
