@@ -62,7 +62,7 @@ def check_pdf(file_name, file):
     except PdfReadError:
         return False
 
-def extract_urls_pdf(file, file_name, list_urls):
+def extract_urls_pdf(file, file_name):
 
     """
     PyPDF2 has problems processing pdfs. The words stay together. 
@@ -141,14 +141,14 @@ def extract_urls_pdf(file, file_name, list_urls):
     os.system("/opt/citationSaver/tikalinkextract-linux64 -seeds -file "+ file_name +" >> ./trash.txt")
 
     # Open the file in read mode
-    with open('./trash.txt', 'r') as file:
+    with open('./trash.txt', 'r') as trash:
         # Read all lines from the file into a list
-        lines = file.readlines()
+        lines = trash.readlines()
     
-    # Strip the newline characters from each line
-    list_urls = [line.strip() for line in lines]
+    os.system("rm -rf ./trash.txt")
 
-    #os.system("rm -rf ./trash.txt")
+    # Strip the newline characters from each line
+    return [line.strip() for line in lines]
 
 def check_urls(list_urls, output_file, list_urls_check):
  
@@ -180,6 +180,8 @@ def check_urls(list_urls, output_file, list_urls_check):
     return list_urls_check
 
 def update_google_sheet(file, path_output, list_urls, list_urls_check, note, error):
+
+
     
     #Get the index from the file being processed in the google sheet
     index = df.index[df['File Name CitationSaver System']==file].tolist()
@@ -270,7 +272,7 @@ def processCitationSaver():
                         if check_pdf(file_name, file):
                             
                             #Extract URLs using PyPDF2, PDFx, fitz
-                            extract_urls_pdf(file, file_name, list_urls)
+                            list_urls = extract_urls_pdf(file, file_name)
 
                             output_file = destination + "output_URLs_" + file.replace(".pdf", "") + ".txt"
 
@@ -311,7 +313,7 @@ def processCitationSaver():
                         os.system("mv " + file_name + " " + afterprocessed)
 
                         #Extract URLs using PyPDF2, PDFx, fitz
-                        extract_urls_pdf(file, file_name.replace(".txt", ".pdf"), list_urls)
+                        list_urls = extract_urls_pdf(file, file_name.replace(".txt", ".pdf"))
 
                         output_file = destination + "output_URLs_" + file.replace(".pdf", "") + ".txt"
 
@@ -362,7 +364,7 @@ def processCitationSaver():
                                     if check_pdf(file_output, file):
                                     
                                         #Extract URLs using PyPDF2, PDFx, fitz
-                                        extract_urls_pdf(file, file_output, list_urls)
+                                        list_urls = extract_urls_pdf(file, file_output)
 
                                         output_file = destination + "output_URLs_" + file.replace(".link", ".txt")
 
