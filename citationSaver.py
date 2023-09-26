@@ -138,18 +138,17 @@ def extract_urls_pdf(file, file_name, list_urls):
 
     #TODO - Getting a mechanism to catch errors from tikalinkextract-linux64 script
     #Beware of the file's permissions (tikalinkextract-linux64)
-    os.system("./tikalinkextract-linux64 -seeds -file "+ file_name +" >> ./trash.txt")
+    os.system("/opt/citationSaver/tikalinkextract-linux64 -seeds -file "+ file_name +" >> ./trash.txt")
 
     # Open the file in read mode
     with open('./trash.txt', 'r') as file:
         # Read all lines from the file into a list
         lines = file.readlines()
     
-
     # Strip the newline characters from each line
     list_urls = [line.strip() for line in lines]
 
-    os.system("rm -rf ./trash.txt")
+    #os.system("rm -rf ./trash.txt")
 
 def check_urls(list_urls, output_file, list_urls_check):
  
