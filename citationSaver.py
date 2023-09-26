@@ -8,12 +8,13 @@ import fitz
 import click
 import argparse
 import os
-from urllib.parse import urlparse, ParseResult
+from urllib.parse import urlparse, ParseResult, urljoin
 from fpdf import FPDF
 import gspread
 import pandas as pd
 from gspread_dataframe import get_as_dataframe, set_with_dataframe
 from subprocess import PIPE, Popen
+from bs4 import BeautifulSoup
 
 #import pdb;pdb.set_trace()
 
@@ -124,9 +125,29 @@ def extract_urls_pdf(file, file_name, list_urls):
     #Third method: tika
 
     # Load PDF
-    process = Popen(['java', '-jar', path_tika, '-t', file_name], stdout=PIPE, stderr=PIPE)
-    result = process.communicate()
-    extract_url(result[0].decode('utf-8'), list_urls)
+    #process = Popen(['java', '-jar', path_tika, '-t', file_name], stdout=PIPE, stderr=PIPE)
+    #result = process.communicate()
+    #extract_url(result[0].decode('utf-8'), list_urls)
+
+    """
+    Extract the URLs from the pdf
+    """
+
+    #Waiting Time for each request
+    #time.sleep(2)
+
+    #TODO - Getting a mechanism to catch errors from tikalinkextract-linux64 script
+    #Beware of the file's permissions (tikalinkextract-linux64)
+    os.system("./tikalinkextract-linux64 -seeds -file "+ file_name +" >> ./Output/" + output_filename)
+
+    # Open the file in read mode
+    with open('./Output/'+ output_filename, 'r') as file:
+        # Read all lines from the file into a list
+        lines = file.readlines()
+    
+
+    # Strip the newline characters from each line
+    list_urls = [line.strip() for line in lines]    
 
 def check_urls(list_urls, output_file, list_urls_check):
  
@@ -356,6 +377,30 @@ def processCitationSaver():
 
                                     #Move the processed pdf to a different folder
                                     os.system("mv " + file_output + " " + afterprocessed)
+
+                                elif content_type == "text/html":
+                                    
+                                    #Example: https://www.spinellis.gr/sw/url-decay/
+
+                                    # Parse the HTML content of the page using BeautifulSoup
+                                    soup = BeautifulSoup(response.text, 'html.parser')
+                                    
+                                    # Find all anchor tags (links) on the page
+                                    links = soup.find_all('a')
+                                    
+                                    # Extract and print the absolute URLs of each link
+                                    for link in links:
+                                        href = link.get('href')
+                                        if href:
+                                            list_urls.append(urljoin(base_url, href))  # Transform relative URL to absolute
+
+                                    output_file = destination + "output_URLs_" + file.replace(".link", ".txt")
+
+                                    #Check if the URLs are correct and write in a file
+                                    list_urls_check = check_urls(list_urls, output_file, list_urls_check)
+
+                                    #Update GoogleSheet
+                                    update_google_sheet(file, output_file, list_urls, list_urls_check, "", False)
 
                                 else:
                                     #Update GoogleSheet
