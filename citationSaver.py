@@ -16,6 +16,7 @@ from gspread_dataframe import get_as_dataframe, set_with_dataframe
 from subprocess import PIPE, Popen
 from bs4 import BeautifulSoup
 
+
 #import pdb;pdb.set_trace()
 
 # Parse args
@@ -347,6 +348,7 @@ def processCitationSaver():
                                 #Get the type of document downloaded
                                 content_type = response.headers.get('content-type')
 
+                                print(content_type)
                                 #Sanity Check
                                 if content_type == "application/pdf":
 
@@ -384,6 +386,12 @@ def processCitationSaver():
                                 elif content_type == "text/html":
                                     
                                     #Example: https://www.spinellis.gr/sw/url-decay/
+                                    
+                                    # Parse the full URL
+                                    #parsed_url = urlparse(first_line)
+
+                                    # Extract the base URL
+                                    #base_url = parsed_url.scheme + '://' + parsed_url.netloc
 
                                     # Parse the HTML content of the page using BeautifulSoup
                                     soup = BeautifulSoup(response.text, 'html.parser')
@@ -395,7 +403,7 @@ def processCitationSaver():
                                     for link in links:
                                         href = link.get('href')
                                         if href:
-                                            list_urls.append(urljoin(base_url, href))  # Transform relative URL to absolute
+                                            list_urls.append(urljoin(first_line, href))  # Transform relative URL to absolute
 
                                     output_file = destination + "output_URLs_" + file.replace(".link", ".txt")
 
@@ -422,6 +430,11 @@ def processCitationSaver():
     set_with_dataframe(worksheet, df)
 
 if __name__ == '__main__':
+
+    #confirm the permissions
+    os.system("chmod +x /opt/citationSaver/tikalinkextract-linux64")
+
+    #Process
     processCitationSaver()
 
  

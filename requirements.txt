@@ -7,3 +7,4 @@ click==7.0
 gspread==5.3.2
 gspread-dataframe==3.3.0
 fpdf==1.7.2
+bs4
