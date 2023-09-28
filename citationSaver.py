@@ -15,6 +15,8 @@ import pandas as pd
 from gspread_dataframe import get_as_dataframe, set_with_dataframe
 from subprocess import PIPE, Popen
 from bs4 import BeautifulSoup
+import tldextract
+
 
 
 #import pdb;pdb.set_trace()
@@ -123,19 +125,19 @@ def extract_urls_pdf(file, file_name):
     extract_url(text, list_urls)
     """
 
-    #Third method: tika
+    #Fourth method: tika
 
     # Load PDF
+    #The method works, but it is slow and the extractor can be unreliable
+
     #process = Popen(['java', '-jar', path_tika, '-t', file_name], stdout=PIPE, stderr=PIPE)
     #result = process.communicate()
     #extract_url(result[0].decode('utf-8'), list_urls)
 
-    """
-    Extract the URLs from the pdf
-    """
+    #Fifth method: tika from DSpace Link Extractor (https://github.com/arquivo/dspace-link-extractor)
 
     #Waiting Time for each request
-    #time.sleep(2)
+    time.sleep(2)
 
     #TODO - Getting a mechanism to catch errors from tikalinkextract-linux64 script
     #Beware of the file's permissions (tikalinkextract-linux64)
@@ -146,6 +148,7 @@ def extract_urls_pdf(file, file_name):
         # Read all lines from the file into a list
         lines = trash.readlines()
     
+    #Delete the temporary file
     os.system("rm -rf ./trash.txt")
 
     # Strip the newline characters from each line
@@ -181,8 +184,6 @@ def check_urls(list_urls, output_file, list_urls_check):
     return list_urls_check
 
 def update_google_sheet(file, path_output, list_urls, list_urls_check, note, error):
-
-
     
     #Get the index from the file being processed in the google sheet
     index = df.index[df['File Name CitationSaver System']==file].tolist()
@@ -350,7 +351,7 @@ def processCitationSaver():
 
                                 print(content_type)
                                 #Sanity Check
-                                if content_type == "application/pdf":
+                                if content_type.startswith("application/pdf"):
 
                                     #Create a new PDF file with the response content
                                     file_output = os.path.join(subdir, file.replace(".link", ".pdf"))
@@ -383,12 +384,15 @@ def processCitationSaver():
                                     #Move the processed pdf to a different folder
                                     os.system("mv " + file_output + " " + afterprocessed)
 
-                                elif content_type == "text/html":
+                                elif content_type.startswith("text/html"):
                                     
                                     #Example: https://www.spinellis.gr/sw/url-decay/
+                                    #Example: https://pt.wikipedia.org/wiki/Portugal - reaches the limit of the numbers of 50000 characters in a single cell
                                     
-                                    # Parse the full URL
-                                    #parsed_url = urlparse(first_line)
+                                    #Parse the full URL
+                                    #I need this?
+                                    domain_parts = tldextract.extract(first_line)
+                                    main_domain = f"{domain_parts.domain}.{domain_parts.suffix}"
 
                                     # Extract the base URL
                                     #base_url = parsed_url.scheme + '://' + parsed_url.netloc
@@ -403,8 +407,11 @@ def processCitationSaver():
                                     for link in links:
                                         href = link.get('href')
                                         if href:
-                                            list_urls.append(urljoin(first_line, href))  # Transform relative URL to absolute
-
+                                            url = urljoin(first_line, href)
+                                            if url not in list_urls:
+                                                if main_domain not in url:
+                                                    list_urls.append(url)  # Transform relative URL to absolute
+                                    
                                     output_file = destination + "output_URLs_" + file.replace(".link", ".txt")
 
                                     #Check if the URLs are correct and write in a file
@@ -412,6 +419,9 @@ def processCitationSaver():
 
                                     #Update GoogleSheet
                                     update_google_sheet(file, output_file, list_urls, list_urls_check, "", False)
+
+                                    #Move the processed pdf to a different folder
+                                    os.system("mv " + file_name + " " + afterprocessed)
 
                                 else:
                                     #Update GoogleSheet
@@ -432,6 +442,7 @@ def processCitationSaver():
 if __name__ == '__main__':
 
     #confirm the permissions
+    #Beware of the file's permissions (tikalinkextract-linux64)
     os.system("chmod +x /opt/citationSaver/tikalinkextract-linux64")
 
     #Process
