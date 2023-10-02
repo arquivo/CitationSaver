@@ -154,7 +154,7 @@ def extract_urls_pdf(file, file_name):
     # Strip the newline characters from each line
     return [line.strip() for line in lines]
 
-def check_urls(list_urls, output_file, list_urls_check):
+def check_urls(list_urls, output_file):
  
     if list_urls != []:
         # Process the URLs 
@@ -170,20 +170,9 @@ def check_urls(list_urls, output_file, list_urls_check):
                 if elem.endswith(";") or elem.endswith(".") or elem.endswith(")") or elem.endswith("/"):
                     elem = elem[:-1]
 
-                url_parse = urlparse(elem, 'http')
+                output.write(elem+"\n")
 
-                netloc = url_parse.netloc or url_parse.path
-                
-                if not netloc.startswith('www.'):
-                    netloc = 'www.' + netloc 
-
-                if netloc.lower() not in list_urls_check:
-                    output.write(netloc.lower()+"\n")
-                    list_urls_check.append(netloc)
-
-    return list_urls_check
-
-def update_google_sheet(file, path_output, list_urls, list_urls_check, note, error):
+def update_google_sheet(file, path_output, note, error):
     
     #Get the index from the file being processed in the google sheet
     index = df.index[df['File Name CitationSaver System']==file].tolist()
@@ -191,12 +180,11 @@ def update_google_sheet(file, path_output, list_urls, list_urls_check, note, err
     if not error:
 
         #Check if columns are empty for the present row
-        if pd.isnull(df.at[index[0], 'Results URLs File Path']) and pd.isnull(df.at[index[0], 'Results URLs without check']) and pd.isnull(df.at[index[0], 'Results URLs domain']):
+        if pd.isnull(df.at[index[0], 'Results URLs File Path']):
                 
                 #Update value Google Sheet
                 df.at[index[0], 'Results URLs File Path'] = path_output
-                df.at[index[0], 'Results URLs without check'] = list_urls
-                df.at[index[0], 'Results URLs domain'] = list_urls_check
+
                 if note != "":
                     if not pd.isnull(df.at[index[0], 'Note/Error']):
                         df.at[index[0], 'Note/Error'] = str(df.at[index[0], 'Note/Error']) + " " + note
@@ -262,7 +250,6 @@ def processCitationSaver():
 
                     #List with the URLs extracted
                     list_urls = []
-                    list_urls_check = []
 
                     #Complete file path name
                     file_name = os.path.join(subdir, file)
@@ -279,14 +266,14 @@ def processCitationSaver():
                             output_file = destination + "output_URLs_" + file.replace(".pdf", "") + ".txt"
 
                             #Check if the URLs are correct and write in a file
-                            list_urls_check = check_urls(list_urls, output_file, list_urls_check)
+                            check_urls(list_urls, output_file)
 
                             #Update GoogleSheet
-                            update_google_sheet(file, output_file, list_urls, list_urls_check, "", False)
+                            update_google_sheet(file, output_file, "", False)
 
                         else:
                             #Update GoogleSheet
-                            update_google_sheet(file, "-", "-", "-", "The PDF download is not in the correct form", True)
+                            update_google_sheet(file, "-", "The PDF download is not in the correct form", True)
 
                         #Move the processed pdf to a different folder
                         os.system("mv " + file_name + " " + afterprocessed)
@@ -320,10 +307,10 @@ def processCitationSaver():
                         output_file = destination + "output_URLs_" + file.replace(".pdf", "") + ".txt"
 
                         #Check if the URLs are correct and write in a file
-                        list_urls_check = check_urls(list_urls, output_file, list_urls_check)
+                        check_urls(list_urls, output_file)
 
                         #Update GoogleSheet
-                        update_google_sheet(file, output_file, list_urls, list_urls_check, "", False)
+                        update_google_sheet(file, output_file, "", False)
 
                         #Move the processed pdf to a different folder
                         os.system("rm -rf " + file_name.replace(".txt", ".pdf"))
@@ -372,14 +359,14 @@ def processCitationSaver():
                                         output_file = destination + "output_URLs_" + file.replace(".link", ".txt")
 
                                         #Check if the URLs are correct and write in a file
-                                        list_urls_check = check_urls(list_urls, output_file, list_urls_check)
+                                        check_urls(list_urls, output_file)
 
                                         #Update GoogleSheet
-                                        update_google_sheet(file, output_file, list_urls, list_urls_check, "", False)
+                                        update_google_sheet(file, output_file, "", False)
                                     
                                     else:
                                         #Update GoogleSheet
-                                        update_google_sheet(file, "-", "-", "-", "The PDF download is not in the correct form", True)
+                                        update_google_sheet(file, "-", "The PDF download is not in the correct form", True)
 
                                     #Move the processed pdf to a different folder
                                     os.system("mv " + file_output + " " + afterprocessed)
@@ -387,15 +374,6 @@ def processCitationSaver():
                                 elif content_type.startswith("text/html"):
                                     
                                     #Example: https://www.spinellis.gr/sw/url-decay/
-                                    #Example: https://pt.wikipedia.org/wiki/Portugal - reaches the limit of the numbers of 50000 characters in a single cell
-                                    
-                                    #Parse the full URL
-                                    #I need this?
-                                    domain_parts = tldextract.extract(first_line)
-                                    main_domain = f"{domain_parts.domain}.{domain_parts.suffix}"
-
-                                    # Extract the base URL
-                                    #base_url = parsed_url.scheme + '://' + parsed_url.netloc
 
                                     # Parse the HTML content of the page using BeautifulSoup
                                     soup = BeautifulSoup(response.text, 'html.parser')
@@ -409,32 +387,31 @@ def processCitationSaver():
                                         if href:
                                             url = urljoin(first_line, href)
                                             if url not in list_urls:
-                                                if main_domain not in url:
-                                                    list_urls.append(url)  # Transform relative URL to absolute
+                                                list_urls.append(url)  # Transform relative URL to absolute
                                     
                                     output_file = destination + "output_URLs_" + file.replace(".link", ".txt")
 
                                     #Check if the URLs are correct and write in a file
-                                    list_urls_check = check_urls(list_urls, output_file, list_urls_check)
+                                    check_urls(list_urls, output_file)
 
                                     #Update GoogleSheet
-                                    update_google_sheet(file, output_file, list_urls, list_urls_check, "", False)
+                                    update_google_sheet(file, output_file, "", False)
 
                                     #Move the processed pdf to a different folder
                                     os.system("mv " + file_name + " " + afterprocessed)
 
                                 else:
                                     #Update GoogleSheet
-                                    update_google_sheet(file, "-", "-", "-", "The document download is not application/pdf", True)
+                                    update_google_sheet(file, "-", "The document download is not application/pdf", True)
                             else:
                                 #Update GoogleSheet
-                                update_google_sheet(file, "-", "-", "-", "The link is not 200", True)
+                                update_google_sheet(file, "-", "The link is not 200", True)
                         else:
                             #Update GoogleSheet
-                            update_google_sheet(file, "-", "-", "-", "The link have more than one line", True)
+                            update_google_sheet(file, "-", "The link have more than one line", True)
                     else:
                         #Update GoogleSheet
-                        update_google_sheet(file, "-", "-", "-", "Wrong File", True)
+                        update_google_sheet(file, "-", "Wrong File", True)
     
     #Update the google sheet
     set_with_dataframe(worksheet, df)
