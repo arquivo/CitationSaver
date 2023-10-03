@@ -15,7 +15,7 @@ import pandas as pd
 from gspread_dataframe import get_as_dataframe, set_with_dataframe
 from subprocess import PIPE, Popen
 from bs4 import BeautifulSoup
-
+import time
 
 
 #import pdb;pdb.set_trace()
