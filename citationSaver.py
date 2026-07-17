@@ -13,7 +13,8 @@ from fpdf import FPDF
 import gspread
 import pandas as pd
 from gspread_dataframe import get_as_dataframe, set_with_dataframe
-from subprocess import PIPE, Popen
+import subprocess
+import shutil
 from bs4 import BeautifulSoup
 import time
 
@@ -140,15 +141,16 @@ def extract_urls_pdf(file, file_name):
 
     #TODO - Getting a mechanism to catch errors from tikalinkextract-linux64 script
     #Beware of the file's permissions (tikalinkextract-linux64)
-    os.system("/opt/citationSaver/tikalinkextract-linux64 -seeds -file "+ file_name +" >> ./trash.txt")
+    with open('./trash.txt', 'a') as trash_out:
+        subprocess.run(['/opt/citationSaver/tikalinkextract-linux64', '-seeds', '-file', file_name], stdout=trash_out)
 
     # Open the file in read mode
     with open('./trash.txt', 'r') as trash:
         # Read all lines from the file into a list
         lines = trash.readlines()
-    
+
     #Delete the temporary file
-    os.system("rm -rf ./trash.txt")
+    os.remove('./trash.txt')
 
     # Strip the newline characters from each line
     return [line.strip() for line in lines]
@@ -275,7 +277,7 @@ def processCitationSaver():
                             update_google_sheet(file, "-", "The PDF download is not in the correct form", True)
 
                         #Move the processed pdf to a different folder
-                        os.system("mv " + file_name + " " + afterprocessed)
+                        shutil.move(file_name, afterprocessed)
 
                     #Check if the file is a txt
                     elif file.endswith(".txt"):
@@ -298,7 +300,7 @@ def processCitationSaver():
                         pdf.output(file_name.replace(".txt", ".pdf"))
 
                         #Move the processed pdf to a different folder
-                        os.system("mv " + file_name + " " + afterprocessed)
+                        shutil.move(file_name, afterprocessed)
 
                         #Extract URLs using PyPDF2, PDFx, fitz
                         list_urls = extract_urls_pdf(file, file_name.replace(".txt", ".pdf"))
@@ -312,7 +314,7 @@ def processCitationSaver():
                         update_google_sheet(file, output_file, "", False)
 
                         #Move the processed pdf to a different folder
-                        os.system("rm -rf " + file_name.replace(".txt", ".pdf"))
+                        os.remove(file_name.replace(".txt", ".pdf"))
 
                     #Check if the file is a link
                     elif file.endswith(".link"):
@@ -345,7 +347,7 @@ def processCitationSaver():
                                     output.write(response.content)
 
                                     #Remove the processed .link file
-                                    os.system("rm -rf " + file_name)
+                                    os.remove(file_name)
 
                                     ###Same process as for PDFs files
 
@@ -368,7 +370,7 @@ def processCitationSaver():
                                         update_google_sheet(file, "-", "The PDF download is not in the correct form", True)
 
                                     #Move the processed pdf to a different folder
-                                    os.system("mv " + file_output + " " + afterprocessed)
+                                    shutil.move(file_output, afterprocessed)
 
                                 elif content_type.startswith("text/html"):
                                     
@@ -397,7 +399,7 @@ def processCitationSaver():
                                     update_google_sheet(file, output_file, "", False)
 
                                     #Move the processed pdf to a different folder
-                                    os.system("mv " + file_name + " " + afterprocessed)
+                                    shutil.move(file_name, afterprocessed)
 
                                 else:
                                     #Update GoogleSheet
@@ -419,7 +421,7 @@ if __name__ == '__main__':
 
     #confirm the permissions
     #Beware of the file's permissions (tikalinkextract-linux64)
-    os.system("chmod +x /opt/citationSaver/tikalinkextract-linux64")
+    os.chmod('/opt/citationSaver/tikalinkextract-linux64', 0o755)
 
     #Process
     processCitationSaver()
