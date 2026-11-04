@@ -333,7 +333,7 @@ def process_file(subdir, file, destination, afterprocessed):
             update_google_sheet(file, "-", "The PDF download is not in the correct form", True)
 
         #Move the processed pdf to a different folder
-        os.system("mv " + file_name + " " + afterprocessed)
+        shutil.move(file_name, os.path.join(afterprocessed, file))
 
     #Check if the file is a txt
     elif file.endswith(".txt"):
@@ -357,7 +357,7 @@ def process_file(subdir, file, destination, afterprocessed):
             update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
 
         #Move the processed txt to a different folder
-        os.system("mv " + file_name + " " + afterprocessed)
+        shutil.move(file_name, os.path.join(afterprocessed, file))
 
     #Check if the file is a html page
     elif file.endswith(".html"):
@@ -418,7 +418,7 @@ def process_file(subdir, file, destination, afterprocessed):
                         output.write(response.content)
 
                     #Remove the processed .link file
-                    os.system("rm -rf " + file_name)
+                    os.remove(file_name)
 
                     ###Same process as for PDFs files
 
@@ -444,7 +444,7 @@ def process_file(subdir, file, destination, afterprocessed):
                         update_google_sheet(file, "-", "The PDF download is not in the correct form", True)
 
                     #Move the processed pdf to a different folder
-                    os.system("mv " + file_output + " " + afterprocessed)
+                    shutil.move(file_output, os.path.join(afterprocessed, os.path.basename(file_output)))
 
                 elif content_type.startswith("text/html"):
 
@@ -462,7 +462,7 @@ def process_file(subdir, file, destination, afterprocessed):
                     update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
 
                     #Move the processed pdf to a different folder
-                    os.system("mv " + file_name + " " + afterprocessed)
+                    shutil.move(file_name, os.path.join(afterprocessed, file))
 
                 elif content_type.startswith("text/plain"):
 
@@ -483,7 +483,7 @@ def process_file(subdir, file, destination, afterprocessed):
                         update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
 
                     #Move the processed link to a different folder
-                    os.system("mv " + file_name + " " + afterprocessed)
+                    shutil.move(file_name, os.path.join(afterprocessed, file))
 
                 else:
                     #Update GoogleSheet
