@@ -198,20 +198,10 @@ def update_google_sheet(file, path_output, note, error):
                 df.at[index[0], 'Note/Error'] = "The script is processing the same document over and over again"
     
     else:
-        
-        if path_output == "-" and list_urls == "-" and list_urls_check == "-":
-            
-            #Update value Google Sheet
-            df.at[index[0], 'Results URLs File Path'] = path_output
-            df.at[index[0], 'Results URLs without check'] = list_urls
-            df.at[index[0], 'Results URLs domain'] = list_urls_check
-            df.at[index[0], 'Note/Error'] = note
-        
-        else:
-            if not pd.isnull(df.at[index[0], 'Note/Error']):
-                df.at[index[0], 'Note/Error'] = str(df.at[index[0], 'Note/Error']) + " " + note
-            else:
-                df.at[index[0], 'Note/Error'] = note
+
+        #Update value Google Sheet
+        df.at[index[0], 'Results URLs File Path'] = path_output
+        df.at[index[0], 'Note/Error'] = note
 
 def processCitationSaver():
 
@@ -411,9 +401,6 @@ def processCitationSaver():
                     else:
                         #Update GoogleSheet
                         update_google_sheet(file, "-", "Wrong File", True)
-    
-    #Update the google sheet
-    set_with_dataframe(worksheet, df)
 
 if __name__ == '__main__':
 
@@ -422,7 +409,11 @@ if __name__ == '__main__':
     os.system("chmod +x /opt/citationSaver/tikalinkextract-linux64")
 
     #Process
-    processCitationSaver()
+    try:
+        processCitationSaver()
+    finally:
+        #Update the google sheet, even if the process stopped midway
+        set_with_dataframe(worksheet, df)
 
  
 """
