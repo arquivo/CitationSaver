@@ -159,22 +159,23 @@ def extract_urls_pdf(file, file_name):
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 def check_urls(list_urls, output_file):
- 
-    if list_urls != []:
-        # Process the URLs 
-        
-        with open(output_file, 'w') as output:
 
-            # Remove mailto links
-            links = [url for url in list_urls if "mailto:" not in url]
-            
-            for elem in links:
+    # Remove mailto links
+    links = [url for url in list_urls if "mailto:" not in url]
 
-                #Remove trash at the end of the URLs
-                if elem.endswith(";") or elem.endswith(".") or elem.endswith(")") or elem.endswith("/"):
-                    elem = elem[:-1]
+    #Always create the file, even when there are no URLs
+    with open(output_file, 'w') as output:
 
-                output.write(elem+"\n")
+        for elem in links:
+
+            #Remove trash at the end of the URLs
+            if elem.endswith(";") or elem.endswith(".") or elem.endswith(")") or elem.endswith("/"):
+                elem = elem[:-1]
+
+            output.write(elem+"\n")
+
+    #Number of URLs written
+    return len(links)
 
 def update_google_sheet(file, path_output, note, error):
     
@@ -268,10 +269,10 @@ def processCitationSaver():
                                 output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
 
                                 #Check if the URLs are correct and write in a file
-                                check_urls(list_urls, output_file)
+                                number_urls = check_urls(list_urls, output_file)
 
                                 #Update GoogleSheet
-                                update_google_sheet(file, output_file, "", False)
+                                update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
 
                         else:
                             #Update GoogleSheet
@@ -312,10 +313,10 @@ def processCitationSaver():
                             output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
 
                             #Check if the URLs are correct and write in a file
-                            check_urls(list_urls, output_file)
+                            number_urls = check_urls(list_urls, output_file)
 
                             #Update GoogleSheet
-                            update_google_sheet(file, output_file, "", False)
+                            update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
 
                         #Move the processed pdf to a different folder
                         os.system("rm -rf " + file_name.replace(".txt", ".pdf"))
@@ -370,10 +371,10 @@ def processCitationSaver():
                                             output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
 
                                             #Check if the URLs are correct and write in a file
-                                            check_urls(list_urls, output_file)
+                                            number_urls = check_urls(list_urls, output_file)
 
                                             #Update GoogleSheet
-                                            update_google_sheet(file, output_file, "", False)
+                                            update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
                                     
                                     else:
                                         #Update GoogleSheet
@@ -403,10 +404,10 @@ def processCitationSaver():
                                     output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
 
                                     #Check if the URLs are correct and write in a file
-                                    check_urls(list_urls, output_file)
+                                    number_urls = check_urls(list_urls, output_file)
 
                                     #Update GoogleSheet
-                                    update_google_sheet(file, output_file, "", False)
+                                    update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
 
                                     #Move the processed pdf to a different folder
                                     os.system("mv " + file_name + " " + afterprocessed)
