@@ -8,6 +8,7 @@ import fitz
 import click
 import argparse
 import os
+import shutil
 from urllib.parse import urlparse, ParseResult, urljoin, urldefrag
 from fpdf import FPDF
 import gspread
@@ -159,6 +160,29 @@ def extract_urls_pdf(file, file_name):
 
     # Strip the newline characters from each line
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+def extract_urls_html(html, base_url=""):
+
+    list_urls = []
+
+    # Parse the HTML content of the page using BeautifulSoup
+    soup = BeautifulSoup(html, 'html.parser')
+
+    # Find all anchor tags (links) on the page
+    for link in soup.find_all('a'):
+        href = link.get('href')
+        if href:
+            # Transform relative URL to absolute (only possible when the page address is known) and drop the #fragment
+            url = urldefrag(urljoin(base_url, href.strip()))[0]
+
+            #Keep only web links (skip javascript:, tel:, mailto:, relative links without base, ...) and skip the page itself
+            if urlparse(url).scheme not in ("http", "https") or url == urldefrag(base_url)[0]:
+                continue
+
+            if url not in list_urls:
+                list_urls.append(url)
+
+    return list_urls
 
 def clean_url(url):
 
@@ -353,6 +377,27 @@ def processCitationSaver():
                         #Move the processed pdf to a different folder
                         os.system("rm -rf " + file_name.replace(".txt", ".pdf"))
 
+                    #Check if the file is a html page
+                    elif file.endswith(".html"):
+
+                        #Read the bytes and let BeautifulSoup detect the encoding
+                        with open(file_name, "rb") as file_html:
+                            html = file_html.read()
+
+                        #Extract the links of the page (an uploaded page has no address, so relative links are lost)
+                        list_urls = extract_urls_html(html)
+
+                        output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
+
+                        #Check if the URLs are correct and write in a file
+                        number_urls = check_urls(list_urls, output_file)
+
+                        #Update GoogleSheet
+                        update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
+
+                        #Move the processed html to a different folder
+                        shutil.move(file_name, os.path.join(afterprocessed, file))
+
                     #Check if the file is a link
                     elif file.endswith(".link"):
                         
@@ -423,26 +468,9 @@ def processCitationSaver():
                                     
                                     #Example: https://www.spinellis.gr/sw/url-decay/
 
-                                    # Parse the HTML content of the page using BeautifulSoup
-                                    soup = BeautifulSoup(response.text, 'html.parser')
-                                    
-                                    # Find all anchor tags (links) on the page
-                                    links = soup.find_all('a')
-                                    
-                                    # Extract and print the absolute URLs of each link
-                                    for link in links:
-                                        href = link.get('href')
-                                        if href:
-                                            # Transform relative URL to absolute and drop the #fragment
-                                            url = urldefrag(urljoin(first_line, href))[0]
+                                    #Extract the links of the page
+                                    list_urls = extract_urls_html(response.text, first_line)
 
-                                            #Keep only web links (skip javascript:, tel:, mailto:, ...) and skip the page itself
-                                            if urlparse(url).scheme not in ("http", "https") or url == urldefrag(first_line)[0]:
-                                                continue
-
-                                            if url not in list_urls:
-                                                list_urls.append(url)
-                                    
                                     output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
 
                                     #Check if the URLs are correct and write in a file
