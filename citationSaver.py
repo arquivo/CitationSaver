@@ -19,6 +19,8 @@ from bs4 import BeautifulSoup
 import time
 import sys
 import traceback
+import socket
+import ipaddress
 
 #import pdb;pdb.set_trace()
 
@@ -295,6 +297,38 @@ def wait_for_tika(url, timeout):
                 return False
             time.sleep(2)
 
+def check_public_url(url):
+
+    #Refuse links to localhost, private networks, cloud metadata, ... (every address of the host must be public)
+    try:
+        host = urlparse(url).hostname
+    except ValueError as e:
+        raise requests.exceptions.InvalidURL(str(e))
+    if not host:
+        raise requests.exceptions.InvalidURL("No host in " + url)
+
+    try:
+        addresses = [info[4][0] for info in socket.getaddrinfo(host, None)]
+    except socket.gaierror as e:
+        raise requests.exceptions.ConnectionError("Could not resolve " + host + ": " + str(e))
+
+    for address in addresses:
+        ip = ipaddress.ip_address(address.split('%')[0])
+        if not ip.is_global or ip.is_multicast:
+            raise requests.exceptions.InvalidURL("The link points to a non-public address (" + host + " -> " + address + ")")
+
+def download_link(url):
+
+    #Follow the redirects here, so that every address is checked before it is requested
+    for _ in range(10):
+        check_public_url(url)
+        response = requests.get(url, timeout=30, allow_redirects=False)
+        if not response.is_redirect:
+            return response
+        url = urljoin(url, response.headers['location'])
+
+    raise requests.exceptions.TooManyRedirects("More than 10 redirects")
+
 def process_file(subdir, file, destination, afterprocessed):
 
     #List with the URLs extracted
@@ -398,7 +432,7 @@ def process_file(subdir, file, destination, afterprocessed):
 
             #Request the content
             try:
-                response = requests.get(first_line, timeout=30)
+                response = download_link(first_line)
             except requests.RequestException as e:
                 #Update GoogleSheet
                 update_google_sheet(file, "-", "The link could not be downloaded: " + str(e), True)
