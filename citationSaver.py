@@ -281,6 +281,11 @@ def processCitationSaver():
                     #Complete file path name
                     file_name = os.path.join(subdir, file)
 
+                    #Leave files without a row in the google sheet for the next run (the web app adds the row after saving the file)
+                    if df[df['File Name CitationSaver System']==file].empty:
+                        click.secho("No row in the Google Sheet yet for " + file + ", left for the next run", fg='yellow')
+                        continue
+
                     #Check if the file is a pdf
                     if file.endswith(".pdf"):
 
