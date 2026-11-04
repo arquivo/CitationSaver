@@ -8,7 +8,7 @@ import fitz
 import click
 import argparse
 import os
-from urllib.parse import urlparse, ParseResult, urljoin
+from urllib.parse import urlparse, ParseResult, urljoin, urldefrag
 from fpdf import FPDF
 import gspread
 import pandas as pd
@@ -409,9 +409,15 @@ def processCitationSaver():
                                     for link in links:
                                         href = link.get('href')
                                         if href:
-                                            url = urljoin(first_line, href)
+                                            # Transform relative URL to absolute and drop the #fragment
+                                            url = urldefrag(urljoin(first_line, href))[0]
+
+                                            #Keep only web links (skip javascript:, tel:, mailto:, ...) and skip the page itself
+                                            if urlparse(url).scheme not in ("http", "https") or url == urldefrag(first_line)[0]:
+                                                continue
+
                                             if url not in list_urls:
-                                                list_urls.append(url)  # Transform relative URL to absolute
+                                                list_urls.append(url)
                                     
                                     output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
 
