@@ -161,6 +161,31 @@ def extract_urls_pdf(file, file_name):
     # Strip the newline characters from each line
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
+def extract_urls_txt(file, file_name, text):
+
+    #tikalinkextract reads PDFs, so write the text to a temporary PDF next to the file
+    pdf = FPDF()
+    # Add a page
+    pdf.add_page()
+    # set style and size of font
+    # that you want in the pdf
+    pdf.set_font("Arial", size = 15)
+
+    # insert the texts in pdf
+    for x in text.splitlines():
+        pdf.cell(200, 10, txt = x, ln = 1, align = 'C')
+
+    # save the pdf with name .pdf
+    pdf_name = os.path.splitext(file_name)[0] + ".pdf"
+    pdf.output(pdf_name)
+
+    try:
+        #Extract URLs using tikalinkextract
+        return extract_urls_pdf(file, pdf_name)
+    finally:
+        #Remove the temporary pdf
+        os.remove(pdf_name)
+
 def extract_urls_html(html, base_url=""):
 
     list_urls = []
@@ -340,28 +365,12 @@ def processCitationSaver():
                     #Check if the file is a txt
                     elif file.endswith(".txt"):
 
-                        pdf = FPDF()
-                        # Add a page
-                        pdf.add_page()
-                        # set style and size of font 
-                        # that you want in the pdf
-                        pdf.set_font("Arial", size = 15)
+                        # open the text file in read mode (ISO-8859-1 never fails and is the encoding of the pdf font)
+                        with open(file_name, "r", encoding='ISO-8859-1') as f:
+                            text = f.read()
 
-                        # open the text file in read mode
-                        f = open(file_name, "r", encoding='ISO-8859-1')
-                          
-                        # insert the texts in pdf
-                        for x in f:
-                            pdf.cell(200, 10, txt = x, ln = 1, align = 'C')
-                           
-                        # save the pdf with name .pdf
-                        pdf.output(file_name.replace(".txt", ".pdf"))
-
-                        #Move the processed pdf to a different folder
-                        os.system("mv " + file_name + " " + afterprocessed)
-
-                        #Extract URLs using PyPDF2, PDFx, fitz
-                        list_urls = extract_urls_pdf(file, file_name.replace(".txt", ".pdf"))
+                        #Extract URLs using tikalinkextract
+                        list_urls = extract_urls_txt(file, file_name, text)
 
                         #Check if the extraction worked
                         if list_urls is not None:
@@ -374,8 +383,8 @@ def processCitationSaver():
                             #Update GoogleSheet
                             update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
 
-                        #Move the processed pdf to a different folder
-                        os.system("rm -rf " + file_name.replace(".txt", ".pdf"))
+                        #Move the processed txt to a different folder
+                        os.system("mv " + file_name + " " + afterprocessed)
 
                     #Check if the file is a html page
                     elif file.endswith(".html"):
@@ -482,9 +491,30 @@ def processCitationSaver():
                                     #Move the processed pdf to a different folder
                                     os.system("mv " + file_name + " " + afterprocessed)
 
+                                elif content_type.startswith("text/plain"):
+
+                                    ###Same process as for TXT files
+
+                                    #Extract URLs using tikalinkextract
+                                    list_urls = extract_urls_txt(file, file_name, response.content.decode('ISO-8859-1'))
+
+                                    #Check if the extraction worked
+                                    if list_urls is not None:
+
+                                        output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
+
+                                        #Check if the URLs are correct and write in a file
+                                        number_urls = check_urls(list_urls, output_file)
+
+                                        #Update GoogleSheet
+                                        update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
+
+                                    #Move the processed link to a different folder
+                                    os.system("mv " + file_name + " " + afterprocessed)
+
                                 else:
                                     #Update GoogleSheet
-                                    update_google_sheet(file, "-", "The document download is not application/pdf", True)
+                                    update_google_sheet(file, "-", "The document download is not a PDF, HTML or TXT document (" + content_type + ")", True)
                             else:
                                 #Update GoogleSheet
                                 update_google_sheet(file, "-", "The link is not 200", True)
