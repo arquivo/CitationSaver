@@ -332,9 +332,8 @@ def processCitationSaver():
                             if response.status_code == 200:
 
                                 #Get the type of document downloaded
-                                content_type = response.headers.get('content-type')
+                                content_type = response.headers.get('content-type', '').lower()
 
-                                print(content_type)
                                 #Sanity Check
                                 if content_type.startswith("application/pdf"):
 
