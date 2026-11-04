@@ -265,7 +265,7 @@ def processCitationSaver():
                             #Check if the extraction worked
                             if list_urls is not None:
 
-                                output_file = destination + "output_URLs_" + file.replace(".pdf", "") + ".txt"
+                                output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
 
                                 #Check if the URLs are correct and write in a file
                                 check_urls(list_urls, output_file)
@@ -309,7 +309,7 @@ def processCitationSaver():
                         #Check if the extraction worked
                         if list_urls is not None:
 
-                            output_file = destination + "output_URLs_" + file.replace(".pdf", "") + ".txt"
+                            output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
 
                             #Check if the URLs are correct and write in a file
                             check_urls(list_urls, output_file)
@@ -367,7 +367,7 @@ def processCitationSaver():
                                         #Check if the extraction worked
                                         if list_urls is not None:
 
-                                            output_file = destination + "output_URLs_" + file.replace(".link", ".txt")
+                                            output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
 
                                             #Check if the URLs are correct and write in a file
                                             check_urls(list_urls, output_file)
@@ -400,7 +400,7 @@ def processCitationSaver():
                                             if url not in list_urls:
                                                 list_urls.append(url)  # Transform relative URL to absolute
                                     
-                                    output_file = destination + "output_URLs_" + file.replace(".link", ".txt")
+                                    output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
 
                                     #Check if the URLs are correct and write in a file
                                     check_urls(list_urls, output_file)
