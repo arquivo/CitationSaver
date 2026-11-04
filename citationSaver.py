@@ -21,6 +21,7 @@ import sys
 import traceback
 import socket
 import ipaddress
+import threading
 
 #import pdb;pdb.set_trace()
 
@@ -31,6 +32,8 @@ parser.add_argument('-t','--tika', help='Localization of the Tika Jar', default=
 parser.add_argument('-l','--linkextract', help='Localization of the tikalinkextract binary', default= "/opt/citationSaver/tikalinkextract-linux64")
 parser.add_argument('-tu','--tikaurl', help='URL of the Tika server used by tikalinkextract', default= "http://127.0.0.1:9998/")
 parser.add_argument('-tw','--tikawait', help='Seconds to wait for the Tika server to start', type=int, default= 120)
+parser.add_argument('-ds','--downloadsize', help='Maximum size in MB of a document downloaded from a link', type=int, default= 200)
+parser.add_argument('-dt','--downloadtime', help='Maximum time in seconds to download a document from a link', type=int, default= 300)
 parser.add_argument('-d','--destination', help='Destination of the URLs extract', default= "./URLs/")
 parser.add_argument('-a','--afterprocessed', help='Destination of the files processed', default= "./Processed/")
 parser.add_argument('-w','--pathwarc', help='Destination of the WARCs for each file', default= "./WARCs/")
@@ -317,15 +320,59 @@ def check_public_url(url):
         if not ip.is_global or ip.is_multicast:
             raise requests.exceptions.InvalidURL("The link points to a non-public address (" + host + " -> " + address + ")")
 
+def stop_download(response):
+
+    #Shut the connection down, so a read waiting for data returns at once
+    try:
+        response.raw.connection.sock.shutdown(socket.SHUT_RDWR)
+    except Exception:
+        response.close()
+
 def download_link(url):
+
+    #Limits for the downloaded document (size in MB, time in seconds)
+    max_size = args['downloadsize'] * 1024 * 1024
+    deadline = time.time() + args['downloadtime']
 
     #Follow the redirects here, so that every address is checked before it is requested
     for _ in range(10):
         check_public_url(url)
-        response = requests.get(url, timeout=30, allow_redirects=False)
-        if not response.is_redirect:
-            return response
-        url = urljoin(url, response.headers['location'])
+        response = requests.get(url, timeout=30, allow_redirects=False, stream=True)
+        if response.is_redirect:
+            response.close()
+            url = urljoin(url, response.headers['location'])
+            continue
+
+        #Refuse early when the server already says the document is too big
+        length = response.headers.get('content-length', '')
+        if length.isdigit() and int(length) > max_size:
+            response.close()
+            raise requests.RequestException("The document is larger than " + str(args['downloadsize']) + " MB")
+
+        #The timeout of requests is per read only, so a server sending a byte now and then is cut by a timer at the deadline
+        timer = threading.Timer(max(deadline - time.time(), 0), stop_download, [response])
+        timer.daemon = True
+        timer.start()
+
+        #Read the body in chunks, so a huge download is stopped
+        content = bytearray()
+        try:
+            for chunk in response.iter_content(64 * 1024):
+                content += chunk
+                if len(content) > max_size:
+                    raise requests.RequestException("The document is larger than " + str(args['downloadsize']) + " MB")
+        except Exception:
+            if time.time() < deadline:
+                raise
+        finally:
+            timer.cancel()
+            response.close()
+        if time.time() >= deadline:
+            raise requests.exceptions.Timeout("The download took longer than " + str(args['downloadtime']) + " seconds")
+
+        #Keep the body in the response, so response.content and response.text work as usual
+        response._content = bytes(content)
+        return response
 
     raise requests.exceptions.TooManyRedirects("More than 10 redirects")
 
