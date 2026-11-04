@@ -13,7 +13,7 @@ from fpdf import FPDF
 import gspread
 import pandas as pd
 from gspread_dataframe import get_as_dataframe, set_with_dataframe
-from subprocess import PIPE, Popen
+import subprocess
 from bs4 import BeautifulSoup
 import time
 
@@ -24,6 +24,7 @@ import time
 parser = argparse.ArgumentParser(description='Description of your program')
 parser.add_argument('-p','--path', help='Localization of the files', default= "./CitationSaver/")
 parser.add_argument('-t','--tika', help='Localization of the Tika Jar', default= "tika-app-1.24.1.jar")
+parser.add_argument('-l','--linkextract', help='Localization of the tikalinkextract binary', default= "/opt/citationSaver/tikalinkextract-linux64")
 parser.add_argument('-d','--destination', help='Destination of the URLs extract', default= "./URLs/")
 parser.add_argument('-a','--afterprocessed', help='Destination of the files processed', default= "./Processed/")
 parser.add_argument('-w','--pathwarc', help='Destination of the WARCs for each file', default= "./WARCs/")
@@ -42,6 +43,9 @@ df = get_as_dataframe(worksheet)
 
 #Path Tika Jar
 path_tika = args['tika']
+
+#Path tikalinkextract binary
+path_linkextract = args['linkextract']
 
 #Global variable with the URLs check for each document
 #list_urls_check = []
@@ -138,20 +142,21 @@ def extract_urls_pdf(file, file_name):
     #Waiting Time for each request
     time.sleep(2)
 
-    #TODO - Getting a mechanism to catch errors from tikalinkextract-linux64 script
     #Beware of the file's permissions (tikalinkextract-linux64)
-    os.system("/opt/citationSaver/tikalinkextract-linux64 -seeds -file "+ file_name +" >> ./trash.txt")
+    try:
+        result = subprocess.run([path_linkextract, "-seeds", "-file", file_name], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=600)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        #Update GoogleSheet
+        update_google_sheet(file, "-", "Problem using tikalinkextract: " + str(e), True)
+        return None
 
-    # Open the file in read mode
-    with open('./trash.txt', 'r') as trash:
-        # Read all lines from the file into a list
-        lines = trash.readlines()
-    
-    #Delete the temporary file
-    os.system("rm -rf ./trash.txt")
+    if result.returncode != 0:
+        #Update GoogleSheet
+        update_google_sheet(file, "-", "Problem using tikalinkextract: " + result.stderr.strip(), True)
+        return None
 
     # Strip the newline characters from each line
-    return [line.strip() for line in lines]
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 def check_urls(list_urls, output_file):
  
@@ -257,13 +262,16 @@ def processCitationSaver():
                             #Extract URLs using PyPDF2, PDFx, fitz
                             list_urls = extract_urls_pdf(file, file_name)
 
-                            output_file = destination + "output_URLs_" + file.replace(".pdf", "") + ".txt"
+                            #Check if the extraction worked
+                            if list_urls is not None:
 
-                            #Check if the URLs are correct and write in a file
-                            check_urls(list_urls, output_file)
+                                output_file = destination + "output_URLs_" + file.replace(".pdf", "") + ".txt"
 
-                            #Update GoogleSheet
-                            update_google_sheet(file, output_file, "", False)
+                                #Check if the URLs are correct and write in a file
+                                check_urls(list_urls, output_file)
+
+                                #Update GoogleSheet
+                                update_google_sheet(file, output_file, "", False)
 
                         else:
                             #Update GoogleSheet
@@ -298,13 +306,16 @@ def processCitationSaver():
                         #Extract URLs using PyPDF2, PDFx, fitz
                         list_urls = extract_urls_pdf(file, file_name.replace(".txt", ".pdf"))
 
-                        output_file = destination + "output_URLs_" + file.replace(".pdf", "") + ".txt"
+                        #Check if the extraction worked
+                        if list_urls is not None:
 
-                        #Check if the URLs are correct and write in a file
-                        check_urls(list_urls, output_file)
+                            output_file = destination + "output_URLs_" + file.replace(".pdf", "") + ".txt"
 
-                        #Update GoogleSheet
-                        update_google_sheet(file, output_file, "", False)
+                            #Check if the URLs are correct and write in a file
+                            check_urls(list_urls, output_file)
+
+                            #Update GoogleSheet
+                            update_google_sheet(file, output_file, "", False)
 
                         #Move the processed pdf to a different folder
                         os.system("rm -rf " + file_name.replace(".txt", ".pdf"))
@@ -353,13 +364,16 @@ def processCitationSaver():
                                         #Extract URLs using PyPDF2, PDFx, fitz
                                         list_urls = extract_urls_pdf(file, file_output)
 
-                                        output_file = destination + "output_URLs_" + file.replace(".link", ".txt")
+                                        #Check if the extraction worked
+                                        if list_urls is not None:
 
-                                        #Check if the URLs are correct and write in a file
-                                        check_urls(list_urls, output_file)
+                                            output_file = destination + "output_URLs_" + file.replace(".link", ".txt")
 
-                                        #Update GoogleSheet
-                                        update_google_sheet(file, output_file, "", False)
+                                            #Check if the URLs are correct and write in a file
+                                            check_urls(list_urls, output_file)
+
+                                            #Update GoogleSheet
+                                            update_google_sheet(file, output_file, "", False)
                                     
                                     else:
                                         #Update GoogleSheet
@@ -414,7 +428,10 @@ if __name__ == '__main__':
 
     #confirm the permissions
     #Beware of the file's permissions (tikalinkextract-linux64)
-    os.system("chmod +x /opt/citationSaver/tikalinkextract-linux64")
+    try:
+        os.chmod(path_linkextract, 0o755)
+    except OSError as e:
+        click.secho("Could not set permissions on tikalinkextract: " + str(e), fg='yellow')
 
     #Process
     try:
