@@ -158,6 +158,19 @@ def extract_urls_pdf(file, file_name):
     # Strip the newline characters from each line
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
+def clean_url(url):
+
+    #Remove trailing punctuation picked up from the surrounding text
+    while url.endswith((";", ".", ")")):
+
+        #Keep closing brackets that are part of the URL, e.g. wiki/Foo_(bar)
+        if url.endswith(")") and url.count("(") >= url.count(")"):
+            break
+
+        url = url[:-1]
+
+    return url
+
 def check_urls(list_urls, output_file):
 
     # Remove mailto links
@@ -169,8 +182,7 @@ def check_urls(list_urls, output_file):
         for elem in links:
 
             #Remove trash at the end of the URLs
-            if elem.endswith(";") or elem.endswith(".") or elem.endswith(")") or elem.endswith("/"):
-                elem = elem[:-1]
+            elem = clean_url(elem)
 
             output.write(elem+"\n")
 
