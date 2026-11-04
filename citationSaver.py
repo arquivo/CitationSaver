@@ -339,8 +339,8 @@ def processCitationSaver():
 
                                     #Create a new PDF file with the response content
                                     file_output = os.path.join(subdir, file.replace(".link", ".pdf"))
-                                    output = open(file_output, "wb")
-                                    output.write(response.content)
+                                    with open(file_output, "wb") as output:
+                                        output.write(response.content)
 
                                     #Remove the processed .link file
                                     os.system("rm -rf " + file_name)
