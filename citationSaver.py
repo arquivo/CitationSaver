@@ -313,18 +313,22 @@ def processCitationSaver():
                     elif file.endswith(".link"):
                         
                         #Open the file
-                        file_link = open(file_name, "r")
+                        with open(file_name, "r") as file_link:
+                            lines = file_link.readlines()
 
-                        lines = file_link.readlines()
-                        
                         if len(lines) == 1:
 
                             #Get the first row
-                            first_line = lines[0]
+                            first_line = lines[0].strip()
 
                             #Request the content
-                            response = requests.get(first_line)
-                            
+                            try:
+                                response = requests.get(first_line, timeout=30)
+                            except requests.RequestException as e:
+                                #Update GoogleSheet
+                                update_google_sheet(file, "-", "The link could not be downloaded: " + str(e), True)
+                                continue
+
                             if response.status_code == 200:
 
                                 #Get the type of document downloaded
