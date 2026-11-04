@@ -16,7 +16,7 @@ from gspread_dataframe import get_as_dataframe, set_with_dataframe
 import subprocess
 from bs4 import BeautifulSoup
 import time
-
+import sys
 
 #import pdb;pdb.set_trace()
 
@@ -25,6 +25,8 @@ parser = argparse.ArgumentParser(description='Description of your program')
 parser.add_argument('-p','--path', help='Localization of the files', default= "./CitationSaver/")
 parser.add_argument('-t','--tika', help='Localization of the Tika Jar', default= "tika-app-1.24.1.jar")
 parser.add_argument('-l','--linkextract', help='Localization of the tikalinkextract binary', default= "/opt/citationSaver/tikalinkextract-linux64")
+parser.add_argument('-tu','--tikaurl', help='URL of the Tika server used by tikalinkextract', default= "http://127.0.0.1:9998/")
+parser.add_argument('-tw','--tikawait', help='Seconds to wait for the Tika server to start', type=int, default= 120)
 parser.add_argument('-d','--destination', help='Destination of the URLs extract', default= "./URLs/")
 parser.add_argument('-a','--afterprocessed', help='Destination of the files processed', default= "./Processed/")
 parser.add_argument('-w','--pathwarc', help='Destination of the WARCs for each file', default= "./WARCs/")
@@ -225,6 +227,19 @@ def update_google_sheet(file, path_output, note, error):
         #Update value Google Sheet
         df.at[index[0], 'Results URLs File Path'] = path_output
         df.at[index[0], 'Note/Error'] = note
+
+def wait_for_tika(url, timeout):
+
+    #The Tika server may still be starting, so try again until the timeout
+    deadline = time.time() + timeout
+    while True:
+        try:
+            requests.get(url, timeout=5)
+            return True
+        except requests.RequestException:
+            if time.time() >= deadline:
+                return False
+            time.sleep(2)
 
 def processCitationSaver():
 
@@ -451,6 +466,12 @@ if __name__ == '__main__':
         os.chmod(path_linkextract, 0o755)
     except OSError as e:
         click.secho("Could not set permissions on tikalinkextract: " + str(e), fg='yellow')
+
+    #tikalinkextract needs the Tika server: stop before touching any file if it is not up
+    click.secho("Waiting for the Tika server at " + args['tikaurl'] + "...", fg='green')
+    if not wait_for_tika(args['tikaurl'], args['tikawait']):
+        click.secho("The Tika server is not available. No file was processed.", fg='red')
+        sys.exit(1)
 
     #Process
     try:
