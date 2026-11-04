@@ -360,6 +360,10 @@ def processCitationSaver():
                             #Get the first row
                             first_line = lines[0].strip()
 
+                            #The form accepts links without the scheme (e.g. publico.pt/artigo.pdf): add https:// as the web app does
+                            if not first_line.lower().startswith(("http://", "https://")):
+                                first_line = "https://" + first_line
+
                             #Request the content
                             try:
                                 response = requests.get(first_line, timeout=30)
