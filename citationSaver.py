@@ -18,6 +18,7 @@ import subprocess
 from bs4 import BeautifulSoup
 import time
 import sys
+import traceback
 
 #import pdb;pdb.set_trace()
 
@@ -197,11 +198,15 @@ def extract_urls_html(html, base_url=""):
     for link in soup.find_all('a'):
         href = link.get('href')
         if href:
-            # Transform relative URL to absolute (only possible when the page address is known) and drop the #fragment
-            url = urldefrag(urljoin(base_url, href.strip()))[0]
+            try:
+                # Transform relative URL to absolute (only possible when the page address is known) and drop the #fragment
+                url = urldefrag(urljoin(base_url, href.strip()))[0]
 
-            #Keep only web links (skip javascript:, tel:, mailto:, relative links without base, ...) and skip the page itself
-            if urlparse(url).scheme not in ("http", "https") or url == urldefrag(base_url)[0]:
+                #Keep only web links (skip javascript:, tel:, mailto:, relative links without base, ...) and skip the page itself
+                if urlparse(url).scheme not in ("http", "https") or url == urldefrag(base_url)[0]:
+                    continue
+            except ValueError:
+                #Skip links that are not valid URLs, e.g. http://[oops
                 continue
 
             if url not in list_urls:
@@ -290,6 +295,209 @@ def wait_for_tika(url, timeout):
                 return False
             time.sleep(2)
 
+def process_file(subdir, file, destination, afterprocessed):
+
+    #List with the URLs extracted
+    list_urls = []
+
+    #Complete file path name
+    file_name = os.path.join(subdir, file)
+
+    #Leave files without a row in the google sheet for the next run (the web app adds the row after saving the file)
+    if df[df['File Name CitationSaver System']==file].empty:
+        click.secho("No row in the Google Sheet yet for " + file + ", left for the next run", fg='yellow')
+        return
+
+    #Check if the file is a pdf
+    if file.endswith(".pdf"):
+
+        #Check if the pdf is well formed
+        if check_pdf(file_name, file):
+
+            #Extract URLs using PyPDF2, PDFx, fitz
+            list_urls = extract_urls_pdf(file, file_name)
+
+            #Check if the extraction worked
+            if list_urls is not None:
+
+                output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
+
+                #Check if the URLs are correct and write in a file
+                number_urls = check_urls(list_urls, output_file)
+
+                #Update GoogleSheet
+                update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
+
+        else:
+            #Update GoogleSheet
+            update_google_sheet(file, "-", "The PDF download is not in the correct form", True)
+
+        #Move the processed pdf to a different folder
+        os.system("mv " + file_name + " " + afterprocessed)
+
+    #Check if the file is a txt
+    elif file.endswith(".txt"):
+
+        # open the text file in read mode (ISO-8859-1 never fails and is the encoding of the pdf font)
+        with open(file_name, "r", encoding='ISO-8859-1') as f:
+            text = f.read()
+
+        #Extract URLs using tikalinkextract
+        list_urls = extract_urls_txt(file, file_name, text)
+
+        #Check if the extraction worked
+        if list_urls is not None:
+
+            output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
+
+            #Check if the URLs are correct and write in a file
+            number_urls = check_urls(list_urls, output_file)
+
+            #Update GoogleSheet
+            update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
+
+        #Move the processed txt to a different folder
+        os.system("mv " + file_name + " " + afterprocessed)
+
+    #Check if the file is a html page
+    elif file.endswith(".html"):
+
+        #Read the bytes and let BeautifulSoup detect the encoding
+        with open(file_name, "rb") as file_html:
+            html = file_html.read()
+
+        #Extract the links of the page (an uploaded page has no address, so relative links are lost)
+        list_urls = extract_urls_html(html)
+
+        output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
+
+        #Check if the URLs are correct and write in a file
+        number_urls = check_urls(list_urls, output_file)
+
+        #Update GoogleSheet
+        update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
+
+        #Move the processed html to a different folder
+        shutil.move(file_name, os.path.join(afterprocessed, file))
+
+    #Check if the file is a link
+    elif file.endswith(".link"):
+
+        #Open the file
+        with open(file_name, "r") as file_link:
+            lines = file_link.readlines()
+
+        if len(lines) == 1:
+
+            #Get the first row
+            first_line = lines[0].strip()
+
+            #The form accepts links without the scheme (e.g. publico.pt/artigo.pdf): add https:// as the web app does
+            if not first_line.lower().startswith(("http://", "https://")):
+                first_line = "https://" + first_line
+
+            #Request the content
+            try:
+                response = requests.get(first_line, timeout=30)
+            except requests.RequestException as e:
+                #Update GoogleSheet
+                update_google_sheet(file, "-", "The link could not be downloaded: " + str(e), True)
+                return
+
+            if response.status_code == 200:
+
+                #Get the type of document downloaded
+                content_type = response.headers.get('content-type', '').lower()
+
+                #Sanity Check
+                if content_type.startswith("application/pdf"):
+
+                    #Create a new PDF file with the response content
+                    file_output = os.path.join(subdir, file.replace(".link", ".pdf"))
+                    with open(file_output, "wb") as output:
+                        output.write(response.content)
+
+                    #Remove the processed .link file
+                    os.system("rm -rf " + file_name)
+
+                    ###Same process as for PDFs files
+
+                    #Check if the pdf is well formed
+                    if check_pdf(file_output, file):
+
+                        #Extract URLs using PyPDF2, PDFx, fitz
+                        list_urls = extract_urls_pdf(file, file_output)
+
+                        #Check if the extraction worked
+                        if list_urls is not None:
+
+                            output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
+
+                            #Check if the URLs are correct and write in a file
+                            number_urls = check_urls(list_urls, output_file)
+
+                            #Update GoogleSheet
+                            update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
+
+                    else:
+                        #Update GoogleSheet
+                        update_google_sheet(file, "-", "The PDF download is not in the correct form", True)
+
+                    #Move the processed pdf to a different folder
+                    os.system("mv " + file_output + " " + afterprocessed)
+
+                elif content_type.startswith("text/html"):
+
+                    #Example: https://www.spinellis.gr/sw/url-decay/
+
+                    #Extract the links of the page
+                    list_urls = extract_urls_html(response.text, first_line)
+
+                    output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
+
+                    #Check if the URLs are correct and write in a file
+                    number_urls = check_urls(list_urls, output_file)
+
+                    #Update GoogleSheet
+                    update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
+
+                    #Move the processed pdf to a different folder
+                    os.system("mv " + file_name + " " + afterprocessed)
+
+                elif content_type.startswith("text/plain"):
+
+                    ###Same process as for TXT files
+
+                    #Extract URLs using tikalinkextract
+                    list_urls = extract_urls_txt(file, file_name, response.content.decode('ISO-8859-1'))
+
+                    #Check if the extraction worked
+                    if list_urls is not None:
+
+                        output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
+
+                        #Check if the URLs are correct and write in a file
+                        number_urls = check_urls(list_urls, output_file)
+
+                        #Update GoogleSheet
+                        update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
+
+                    #Move the processed link to a different folder
+                    os.system("mv " + file_name + " " + afterprocessed)
+
+                else:
+                    #Update GoogleSheet
+                    update_google_sheet(file, "-", "The document download is not a PDF, HTML or TXT document (" + content_type + ")", True)
+            else:
+                #Update GoogleSheet
+                update_google_sheet(file, "-", "The link is not 200", True)
+        else:
+            #Update GoogleSheet
+            update_google_sheet(file, "-", "The link have more than one line", True)
+    else:
+        #Update GoogleSheet
+        update_google_sheet(file, "-", "Wrong File", True)
+
 def processCitationSaver():
 
     click.secho("Read inputs...", fg='green')
@@ -324,206 +532,12 @@ def processCitationSaver():
 
                     progress_bar.update(1)
 
-                    #List with the URLs extracted
-                    list_urls = []
-
-                    #Complete file path name
-                    file_name = os.path.join(subdir, file)
-
-                    #Leave files without a row in the google sheet for the next run (the web app adds the row after saving the file)
-                    if df[df['File Name CitationSaver System']==file].empty:
-                        click.secho("No row in the Google Sheet yet for " + file + ", left for the next run", fg='yellow')
-                        continue
-
-                    #Check if the file is a pdf
-                    if file.endswith(".pdf"):
-
-                        #Check if the pdf is well formed
-                        if check_pdf(file_name, file):
-                            
-                            #Extract URLs using PyPDF2, PDFx, fitz
-                            list_urls = extract_urls_pdf(file, file_name)
-
-                            #Check if the extraction worked
-                            if list_urls is not None:
-
-                                output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
-
-                                #Check if the URLs are correct and write in a file
-                                number_urls = check_urls(list_urls, output_file)
-
-                                #Update GoogleSheet
-                                update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
-
-                        else:
-                            #Update GoogleSheet
-                            update_google_sheet(file, "-", "The PDF download is not in the correct form", True)
-
-                        #Move the processed pdf to a different folder
-                        os.system("mv " + file_name + " " + afterprocessed)
-
-                    #Check if the file is a txt
-                    elif file.endswith(".txt"):
-
-                        # open the text file in read mode (ISO-8859-1 never fails and is the encoding of the pdf font)
-                        with open(file_name, "r", encoding='ISO-8859-1') as f:
-                            text = f.read()
-
-                        #Extract URLs using tikalinkextract
-                        list_urls = extract_urls_txt(file, file_name, text)
-
-                        #Check if the extraction worked
-                        if list_urls is not None:
-
-                            output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
-
-                            #Check if the URLs are correct and write in a file
-                            number_urls = check_urls(list_urls, output_file)
-
-                            #Update GoogleSheet
-                            update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
-
-                        #Move the processed txt to a different folder
-                        os.system("mv " + file_name + " " + afterprocessed)
-
-                    #Check if the file is a html page
-                    elif file.endswith(".html"):
-
-                        #Read the bytes and let BeautifulSoup detect the encoding
-                        with open(file_name, "rb") as file_html:
-                            html = file_html.read()
-
-                        #Extract the links of the page (an uploaded page has no address, so relative links are lost)
-                        list_urls = extract_urls_html(html)
-
-                        output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
-
-                        #Check if the URLs are correct and write in a file
-                        number_urls = check_urls(list_urls, output_file)
-
-                        #Update GoogleSheet
-                        update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
-
-                        #Move the processed html to a different folder
-                        shutil.move(file_name, os.path.join(afterprocessed, file))
-
-                    #Check if the file is a link
-                    elif file.endswith(".link"):
-                        
-                        #Open the file
-                        with open(file_name, "r") as file_link:
-                            lines = file_link.readlines()
-
-                        if len(lines) == 1:
-
-                            #Get the first row
-                            first_line = lines[0].strip()
-
-                            #The form accepts links without the scheme (e.g. publico.pt/artigo.pdf): add https:// as the web app does
-                            if not first_line.lower().startswith(("http://", "https://")):
-                                first_line = "https://" + first_line
-
-                            #Request the content
-                            try:
-                                response = requests.get(first_line, timeout=30)
-                            except requests.RequestException as e:
-                                #Update GoogleSheet
-                                update_google_sheet(file, "-", "The link could not be downloaded: " + str(e), True)
-                                continue
-
-                            if response.status_code == 200:
-
-                                #Get the type of document downloaded
-                                content_type = response.headers.get('content-type', '').lower()
-
-                                #Sanity Check
-                                if content_type.startswith("application/pdf"):
-
-                                    #Create a new PDF file with the response content
-                                    file_output = os.path.join(subdir, file.replace(".link", ".pdf"))
-                                    with open(file_output, "wb") as output:
-                                        output.write(response.content)
-
-                                    #Remove the processed .link file
-                                    os.system("rm -rf " + file_name)
-
-                                    ###Same process as for PDFs files
-
-                                    #Check if the pdf is well formed
-                                    if check_pdf(file_output, file):
-                                    
-                                        #Extract URLs using PyPDF2, PDFx, fitz
-                                        list_urls = extract_urls_pdf(file, file_output)
-
-                                        #Check if the extraction worked
-                                        if list_urls is not None:
-
-                                            output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
-
-                                            #Check if the URLs are correct and write in a file
-                                            number_urls = check_urls(list_urls, output_file)
-
-                                            #Update GoogleSheet
-                                            update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
-                                    
-                                    else:
-                                        #Update GoogleSheet
-                                        update_google_sheet(file, "-", "The PDF download is not in the correct form", True)
-
-                                    #Move the processed pdf to a different folder
-                                    os.system("mv " + file_output + " " + afterprocessed)
-
-                                elif content_type.startswith("text/html"):
-                                    
-                                    #Example: https://www.spinellis.gr/sw/url-decay/
-
-                                    #Extract the links of the page
-                                    list_urls = extract_urls_html(response.text, first_line)
-
-                                    output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
-
-                                    #Check if the URLs are correct and write in a file
-                                    number_urls = check_urls(list_urls, output_file)
-
-                                    #Update GoogleSheet
-                                    update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
-
-                                    #Move the processed pdf to a different folder
-                                    os.system("mv " + file_name + " " + afterprocessed)
-
-                                elif content_type.startswith("text/plain"):
-
-                                    ###Same process as for TXT files
-
-                                    #Extract URLs using tikalinkextract
-                                    list_urls = extract_urls_txt(file, file_name, response.content.decode('ISO-8859-1'))
-
-                                    #Check if the extraction worked
-                                    if list_urls is not None:
-
-                                        output_file = destination + "output_URLs_" + os.path.splitext(file)[0] + ".txt"
-
-                                        #Check if the URLs are correct and write in a file
-                                        number_urls = check_urls(list_urls, output_file)
-
-                                        #Update GoogleSheet
-                                        update_google_sheet(file, output_file, "" if number_urls else "No URLs found", False)
-
-                                    #Move the processed link to a different folder
-                                    os.system("mv " + file_name + " " + afterprocessed)
-
-                                else:
-                                    #Update GoogleSheet
-                                    update_google_sheet(file, "-", "The document download is not a PDF, HTML or TXT document (" + content_type + ")", True)
-                            else:
-                                #Update GoogleSheet
-                                update_google_sheet(file, "-", "The link is not 200", True)
-                        else:
-                            #Update GoogleSheet
-                            update_google_sheet(file, "-", "The link have more than one line", True)
-                    else:
-                        #Update GoogleSheet
-                        update_google_sheet(file, "-", "Wrong File", True)
+                    try:
+                        process_file(subdir, file, destination, afterprocessed)
+                    except Exception as e:
+                        #One bad file must not stop the processing of the other files
+                        click.secho("Unexpected error processing " + file + ":\n" + traceback.format_exc(), fg='red')
+                        update_google_sheet(file, "-", "Unexpected error: " + repr(e), True)
 
 if __name__ == '__main__':
 
