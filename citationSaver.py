@@ -1,15 +1,13 @@
 # Import Module
 import PyPDF2
 from PyPDF2.utils import PdfReadError
-import pdfx
 from urlextract import URLExtract
 import requests
-import fitz
 import click
 import argparse
 import os
 import shutil
-from urllib.parse import urlparse, ParseResult, urljoin, urldefrag
+from urllib.parse import urlparse, urljoin, urldefrag
 from fpdf import FPDF
 import gspread
 import pandas as pd
@@ -107,34 +105,6 @@ def extract_urls_pdf(file, file_name):
 
     # CLose the PDF
     pdfFileObject.close()
-    """
-    """
-    #Second method: PDFx
-    
-    # Read PDF File
-    pdf = pdfx.PDFx(file_name)
-    
-    # Get list of URL
-    json = pdf.get_references_as_dict()
-    if len(json) != 0:
-        for elem in json['url']:
-            if elem not in list_urls:
-                list_urls.append(elem)
-    else:
-        #Update GoogleSheet
-        update_google_sheet(file, "", "", "", "Problem using PDFx process", True)
-
-    #Third method: fitz
-
-    # Load PDF
-    with fitz.open(file_name) as doc:
-        text = ""
-        for page in doc:
-            text += page.getText().strip()#.replace("\n", "")
-
-    text = ' '.join(text.split())
-    
-    extract_url(text, list_urls)
     """
 
     #Fourth method: tika
@@ -395,7 +365,7 @@ def process_file(subdir, file, destination, afterprocessed):
         #Check if the pdf is well formed
         if check_pdf(file_name, file):
 
-            #Extract URLs using PyPDF2, PDFx, fitz
+            #Extract URLs using tikalinkextract
             list_urls = extract_urls_pdf(file, file_name)
 
             #Check if the extraction worked
@@ -506,7 +476,7 @@ def process_file(subdir, file, destination, afterprocessed):
                     #Check if the pdf is well formed
                     if check_pdf(file_output, file):
 
-                        #Extract URLs using PyPDF2, PDFx, fitz
+                        #Extract URLs using tikalinkextract
                         list_urls = extract_urls_pdf(file, file_output)
 
                         #Check if the extraction worked
