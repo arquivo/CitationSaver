@@ -176,6 +176,11 @@ def update_google_sheet(file, path_output, note, error):
     #Get the index from the file being processed in the google sheet
     index = df.index[df['File Name CitationSaver System']==file].tolist()
 
+    #Skip files without a row in the google sheet
+    if not index:
+        click.secho("No row in the Google Sheet for " + file, fg='yellow')
+        return
+
     if not error:
 
         #Check if columns are empty for the present row
